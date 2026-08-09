@@ -17,7 +17,9 @@ module Config {
     const DEFAULT_TOKEN = "";
 
     // Srednie spalanie auta, z ktorym porownujemy jazde rowerem [l/100 km].
-    const DEFAULT_SPALANIE = 7.0;
+    // Faktyczne spalanie auta uzytkownika - liczy sie zanim zegarek pobierze
+    // plik z linia "spalanie=" (i gdyby tej linii w pliku zabraklo).
+    const DEFAULT_SPALANIE = 6.5;
 
     // Cena awaryjna [zl/l] - uzywana, gdy nic jeszcze nie pobrano z internetu.
     const DEFAULT_CENA = 7.20;

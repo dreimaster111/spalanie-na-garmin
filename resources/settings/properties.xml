@@ -1,5 +1,5 @@
 <properties>
-    <property id="spalanie" type="float">7.0</property>
+    <property id="spalanie" type="float">6.5</property>
     <property id="cenaAwaryjna" type="float">7.20</property>
     <property id="celZl" type="float">15.0</property>
     <property id="adresCeny" type="string"></property>
