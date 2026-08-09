@@ -13,6 +13,14 @@ Kazdy serwis z cenami paliw to ~100 kB HTML-a. Usluga w tle w Connect IQ ma
 o parsowaniu. Ten skrypt (uruchamiany raz dziennie przez GitHub Actions)
 robi cala brudna robote na serwerze, a zegarek pobiera 16 bajtow.
 
+Gdy zadne zrodlo nie odda dzis ceny, plik zostaje nietkniety - zegarek liczy
+dalej po cenie z poprzedniego dnia, z jej PRAWDZIWA data (w stopce pola danych
+widac wtedy, ze cena jest wczorajsza). Skrypt konczy sie wtedy sukcesem, zeby
+nie zasypywac skrzynki mailami z Actions; dopiero po MAX_DNI_STAROSCI dniach
+bez swiezej ceny zwraca blad, bo to znaczy, ze scraper naprawde wymaga poprawki.
+Historia zawiera wylacznie faktycznie pobrane dni - braki nie sa uzupelniane
+skopiowana cena.
+
 Uruchomienie recznie:
     python tools/fetch_pb95.py
 Tylko podglad, bez zapisu:
@@ -43,6 +51,10 @@ NAGLOWKI = {
 # Sensowny zakres ceny [zl/l] - odsiewa smieci wpadajace z regexpa
 MIN_CENA = 3.0
 MAX_CENA = 20.0
+
+# Ile dni wolno jechac na starej cenie, zanim uznamy scraper za zepsuty
+# i pozwolimy workflowowi sie wywalic (czerwony Actions = sygnal do poprawki).
+MAX_DNI_STAROSCI = 7
 
 
 def pobierz_html(url, timeout=30):
@@ -179,6 +191,26 @@ def wczytaj_historie():
     return wynik
 
 
+def wczytaj_biezaca():
+    """Co obecnie czyta zegarek: (data, cena) albo (None, None)."""
+    if not os.path.exists(PLIK_CENA):
+        return None, None
+    with open(PLIK_CENA, "r", encoding="utf-8", errors="ignore") as f:
+        linia = f.read().strip()
+    czesci = linia.split(",")
+    if len(czesci) == 2 and len(czesci[0]) == 10:
+        return czesci[0], na_float(czesci[1])
+    return None, None
+
+
+def wiek_w_dniach(data_iso):
+    try:
+        d = datetime.date.fromisoformat(data_iso)
+    except ValueError:
+        return None
+    return (datetime.date.today() - d).days
+
+
 def zapisz(cena, data, zrodlo):
     os.makedirs(os.path.dirname(PLIK_CENA), exist_ok=True)
 
@@ -199,10 +231,33 @@ def main():
     p.add_argument("--dry-run", action="store_true", help="tylko pokaz, nie zapisuj")
     args = p.parse_args()
 
+    stara_data, stara_cena = wczytaj_biezaca()
     cena, data, zrodlo = pobierz_cene()
+
+    # Zadne zrodlo nie oddalo ceny - zostawiamy to, co jest, czyli cene
+    # z poprzedniego dnia. NIE podmieniamy jej daty na dzisiejsza: zegarek
+    # pokazuje w stopce dzien, z ktorego cena pochodzi, wiec ma byc widac,
+    # ze jest wczorajsza, zamiast udawac swieza.
     if cena is None:
-        print("Nie udalo sie pobrac ceny z zadnego zrodla.", file=sys.stderr)
-        return 1
+        if stara_cena is None:
+            print("Nie udalo sie pobrac ceny, a w repo nie ma zadnej poprzedniej.",
+                  file=sys.stderr)
+            return 1
+        wiek = wiek_w_dniach(stara_data)
+        print("Nie znalazlem dzisiejszej ceny - zostaje %.2f zl/l z %s (%s dni temu)."
+              % (stara_cena, stara_data, wiek))
+        if wiek is not None and wiek > MAX_DNI_STAROSCI:
+            print("To juz ponad %d dni - scraper zapewne wymaga poprawki."
+                  % MAX_DNI_STAROSCI, file=sys.stderr)
+            return 1
+        return 0
+
+    # Serwis oddal cene starsza niz ta, ktora juz mamy (np. zacieta kopia
+    # strony w cache) - nie cofamy sie.
+    if stara_data is not None and data < stara_data:
+        print("Zrodlo podalo cene z %s, a mamy juz swiezsza z %s - zostawiam bez zmian."
+              % (data, stara_data))
+        return 0
 
     if args.dry_run:
         print("(dry-run) %s,%.2f" % (data, cena))

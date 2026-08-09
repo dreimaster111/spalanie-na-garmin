@@ -53,6 +53,22 @@ Pliki wynikowe:
 - `data/pb95.txt` — jedna linia dla zegarka: `2026-08-09,7.25`
 - `data/pb95-historia.csv` — archiwum `data;cena;źródło` (po jednym wpisie na dzień)
 
+### Gdy dzisiejszej ceny nie ma
+
+Jeśli żadne źródło nie odda ceny, plik zostaje **nietknięty** — zegarek liczy
+dalej po cenie z poprzedniego dnia, ale z jej **prawdziwą datą**, więc w stopce
+pola danych widać, że jest wczorajsza. Data nie jest podmieniana na dzisiejszą
+i historia nie jest uzupełniana skopiowaną ceną — w archiwum lądują wyłącznie
+dni faktycznie pobrane.
+
+Skrypt kończy się wtedy sukcesem (żeby Actions nie zasypywało skrzynki mailami),
+ale po **7 dniach** bez świeżej ceny zwraca błąd — czerwony Actions jest wtedy
+sygnałem, że któryś regex wymaga poprawki.
+
+Pilnowany jest też przypadek odwrotny: gdyby serwis oddał cenę **starszą** niż
+ta, którą już mamy (zacięty cache strony), zapis jest pomijany — nigdy się nie
+cofamy.
+
 Ręczne uruchomienie:
 
 ```bash
