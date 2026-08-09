@@ -5,6 +5,9 @@
     <setting propertyKey="@Properties.cenaAwaryjna" title="@Strings.CenaTitle">
         <settingConfig type="numeric" min="1" max="30"/>
     </setting>
+    <setting propertyKey="@Properties.celZl" title="@Strings.CelTitle">
+        <settingConfig type="numeric" min="0" max="500"/>
+    </setting>
     <setting propertyKey="@Properties.adresCeny" title="@Strings.UrlTitle">
         <settingConfig type="alphaNumeric" maxLength="512"/>
     </setting>

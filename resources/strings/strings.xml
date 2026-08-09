@@ -6,6 +6,7 @@
 
     <string id="SpalanieTitle">Spalanie auta [l/100 km]</string>
     <string id="CenaTitle">Cena awaryjna [zł/l]</string>
+    <string id="CelTitle">Cel na przejazd [zł] (0 = bez paska)</string>
     <string id="UrlTitle">Adres pliku z ceną</string>
     <string id="TokenTitle">Token GitHub (repo prywatne)</string>
 </strings>

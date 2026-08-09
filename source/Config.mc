@@ -22,6 +22,10 @@ module Config {
     // Cena awaryjna [zl/l] - uzywana, gdy nic jeszcze nie pobrano z internetu.
     const DEFAULT_CENA = 7.20;
 
+    // Cel oszczednosci na jeden przejazd [zl] - do paska postepu.
+    // 0 = pasek w ogole sie nie rysuje.
+    const DEFAULT_CEL = 15.0;
+
     // Co ile sekund odswiezac cene (cena zmienia sie raz na dobe, wiec 6 h
     // z zapasem wystarcza). Usluga w tle budzi sie czesciej, ale jesli cena
     // jest swieza - natychmiast konczy prace.

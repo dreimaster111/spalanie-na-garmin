@@ -16,6 +16,7 @@ using Toybox.Lang;
 class SpalanieView extends WatchUi.DataField {
 
     hidden var mSpalanie as Lang.Float = Config.DEFAULT_SPALANIE;
+    hidden var mCel as Lang.Float = Config.DEFAULT_CEL;   // 0 = bez paska
     hidden var mCena as Lang.Float = Config.DEFAULT_CENA;
     hidden var mZSieci as Lang.Boolean = false;
     hidden var mDataCeny as Lang.String? = null;
@@ -97,6 +98,13 @@ class SpalanieView extends WatchUi.DataField {
         } else {
             mSpalanie = Config.DEFAULT_SPALANIE;
         }
+
+        var c = PriceStore.liczbaZUstawien("celZl");
+        if (c != null && c >= 0.0) {
+            mCel = c;
+        } else {
+            mCel = Config.DEFAULT_CEL;
+        }
     }
 
     hidden function wczytajTeksty() as Void {
@@ -131,30 +139,32 @@ class SpalanieView extends WatchUi.DataField {
         var h = dc.getHeight();
         var maleH = dc.getFontHeight(Graphics.FONT_XTINY);
 
-        var zEtykieta = (h >= 52);
-        var zeStopka = (h >= 52 + 2 * maleH);
+        // Kwota jest najwazniejsza. Etykiete, pasek i stopke dokladamy tylko
+        // wtedy, gdy PO ich odjeciu zostaje na nia przynajmniej tyle, ile
+        // zajmuje FONT_MEDIUM - inaczej na niskim kaflu (280x69, 280x49)
+        // ozdoby zjadlyby miejsce i glowna liczba zrobilaby sie mikroskopijna.
+        // Ten sam kod obsluguje wiec i caly ekran (280x280), i pasek 280x49.
+        var minKwota = dc.getFontHeight(Graphics.FONT_MEDIUM);
+        var paskH = h / 14;
+        if (paskH < 5) { paskH = 5; }
+        if (paskH > 10) { paskH = 10; }
 
-        var gora = zEtykieta ? maleH : 0;
-        var dol = zeStopka ? maleH : 0;
+        var gora = 0;
+        var dol = h;
 
-        // etykieta u gory
+        // etykieta u gory - tylko jesli miesci sie tez w POZIOMIE
+        var zEtykieta = (dc.getTextWidthInPixels(mEtykieta, Graphics.FONT_XTINY) <= w - 4)
+                        && (h - maleH >= minKwota);
         if (zEtykieta) {
             dc.setColor(koloSzary, Graphics.COLOR_TRANSPARENT);
             dc.drawText(w / 2, 0, Graphics.FONT_XTINY, mEtykieta,
                         Graphics.TEXT_JUSTIFY_CENTER);
+            gora = maleH;
         }
 
-        // glowna wartosc
-        var tekst = kwota(mZlote) + " " + mZl;
-        var wolneH = h - gora - dol;
-        var font = dobierzFont(dc, tekst, w - 4, wolneH);
-        dc.setColor(kolor, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w / 2, gora + wolneH / 2, font, tekst,
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        // stopka: skad wzieta cena
-        if (zeStopka) {
-            var s = stopka();
+        // stopka: cena i dzien, z ktorego pochodzi - tekst skracany do szerokosci
+        var tekstStopki = stopkaDoSzerokosci(dc, w - 4);
+        if (dol - gora - maleH >= minKwota) {
             var kolorStopki = koloSzary;
             if (!mZSieci) {
                 kolorStopki = (tlo == Graphics.COLOR_BLACK)
@@ -162,9 +172,50 @@ class SpalanieView extends WatchUi.DataField {
                     : Graphics.COLOR_ORANGE;
             }
             dc.setColor(kolorStopki, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(w / 2, h - maleH, Graphics.FONT_XTINY, s,
+            dc.drawText(w / 2, h - maleH, Graphics.FONT_XTINY, tekstStopki,
                         Graphics.TEXT_JUSTIFY_CENTER);
+            dol = h - maleH;
         }
+
+        // pasek postepu do celu oszczednosci na przejazd
+        var udzial = 0.0;
+        if (mCel > 0.0) {
+            udzial = mZlote / mCel;
+            if (udzial > 1.0) { udzial = 1.0; }
+            if (udzial < 0.0) { udzial = 0.0; }
+        }
+        var celOsiagniety = (mCel > 0.0) && (mZlote >= mCel);
+        if (mCel > 0.0 && (dol - gora - paskH - 6 >= minKwota) && (w > 40)) {
+            var margines = 6;
+            var bx = margines;
+            var bw = w - 2 * margines;
+            var by = dol - paskH - 3;
+            var promien = paskH / 2;
+
+            // tor paska
+            dc.setColor(
+                (tlo == Graphics.COLOR_BLACK) ? Graphics.COLOR_DK_GRAY : Graphics.COLOR_LT_GRAY,
+                Graphics.COLOR_TRANSPARENT);
+            dc.fillRoundedRectangle(bx, by, bw, paskH, promien);
+
+            // wypelnienie
+            var wypelnienie = (bw * udzial).toNumber();
+            if (wypelnienie > 0) {
+                if (wypelnienie < paskH) { wypelnienie = paskH; }
+                dc.setColor(Graphics.COLOR_GREEN, Graphics.COLOR_TRANSPARENT);
+                dc.fillRoundedRectangle(bx, by, wypelnienie, paskH, promien);
+            }
+            dol = by - 3;
+        }
+
+        // glowna wartosc - na zielono, gdy cel przejazdu dowieziony
+        var tekst = kwota(mZlote) + " " + mZl;
+        var wolneH = dol - gora;
+        var font = dobierzFont(dc, tekst, w - 4, wolneH);
+        dc.setColor(celOsiagniety ? Graphics.COLOR_GREEN : kolor,
+                    Graphics.COLOR_TRANSPARENT);
+        dc.drawText(w / 2, gora + wolneH / 2, font, tekst,
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     // "12,34" / "123,4" / "1234"
@@ -188,17 +239,35 @@ class SpalanieView extends WatchUi.DataField {
         return s.substring(0, i) + "," + s.substring(i + 1, s.length());
     }
 
-    // np. "7,25 zl/l 09.08" albo "7,20 zl/l ?" gdy cena awaryjna
-    hidden function stopka() as Lang.String {
-        var s = kropkaNaPrzecinek(mCena.format("%.2f")) + " " + mZlL;
+    // Stopka w trzech dlugosciach - bierzemy najdluzsza, ktora miesci sie
+    // w szerokosci kafla. Font XTINY jest najmniejszy jaki mamy, wiec jedyne,
+    // co mozna skracac, to sam tekst.
+    //   pelna:   "7,25 zl/l 09.08"
+    //   srednia: "7,25 09.08"
+    //   krotka:  "7,25"
+    // Przy cenie awaryjnej sufiksem jest "?", ale i tak sygnalizuje ja kolor,
+    // wiec w najkrotszym wariancie mozna go poswiecic.
+    hidden function stopkaDoSzerokosci(dc as Graphics.Dc, maxW as Lang.Number) as Lang.String {
+        var cenaTxt = kropkaNaPrzecinek(mCena.format("%.2f"));
+
+        var sufiks = "?";
         if (mZSieci && mDataCeny != null && mDataCeny.length() >= 10) {
-            s = s + " " + mDataCeny.substring(8, 10) + "." + mDataCeny.substring(5, 7);
+            sufiks = mDataCeny.substring(8, 10) + "." + mDataCeny.substring(5, 7);
         } else if (mBlad != null) {
-            s = s + " " + mBlad;
-        } else {
-            s = s + " ?";
+            sufiks = mBlad;
         }
-        return s;
+
+        var warianty = [
+            cenaTxt + " " + mZlL + " " + sufiks,
+            cenaTxt + " " + sufiks,
+            cenaTxt
+        ];
+        for (var i = 0; i < warianty.size(); i++) {
+            if (dc.getTextWidthInPixels(warianty[i], Graphics.FONT_XTINY) <= maxW) {
+                return warianty[i];
+            }
+        }
+        return cenaTxt;
     }
 
     // najwiekszy font, w ktorym tekst zmiesci sie w kafelku
