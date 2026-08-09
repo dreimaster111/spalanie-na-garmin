@@ -69,6 +69,17 @@ Pilnowany jest też przypadek odwrotny: gdyby serwis oddał cenę **starszą** n
 ta, którą już mamy (zacięty cache strony), zapis jest pomijany — nigdy się nie
 cofamy.
 
+Te reguły są pokryte testem, który Actions odpala **przed** scraperem:
+
+```bash
+python tools/test_fetch_pb95.py
+```
+
+Test nie rusza sieci (podmienia `pobierz_cene`) ani plików w `data/` — pracuje
+na katalogu tymczasowym, więc jest szybki i nie wywali się od tego, że akurat
+któryś serwis nie odpowiada. Regexpy źródeł weryfikuje dopiero prawdziwe
+uruchomienie scrapera.
+
 Ręczne uruchomienie:
 
 ```bash
@@ -123,6 +134,7 @@ source/
   Config.mc               # wartości domyślne/awaryjne (adres, token, spalanie, cena)
 resources/                # teksty, ustawienia, ikona
 tools/fetch_pb95.py       # scraper ceny (uruchamiany przez Actions)
+tools/test_fetch_pb95.py  # testy logiki awaryjnej, bez sieci (Actions odpala je przed scraperem)
 data/pb95.txt             # to, co czyta zegarek
 .github/workflows/pb95.yml
 ```
