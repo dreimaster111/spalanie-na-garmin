@@ -14,6 +14,8 @@ module PriceStore {
     const KEY_DATA = "cenaData";    // String "YYYY-MM-DD" - z ktorego dnia cena
     const KEY_POBRANO = "cenaPobrano"; // Number, czas pobrania (epoch)
     const KEY_BLAD = "cenaBlad";    // String albo null
+    const KEY_SPALANIE = "ustSpalanie"; // Float, l/100 km z pobranego pliku
+    const KEY_CEL = "ustCel";       // Float, cel na przejazd [zl] z pobranego pliku
 
     // Cena do liczenia oszczednosci: pobrana z sieci, a jak jej nie ma -
     // awaryjna z ustawien / z Config.
@@ -36,6 +38,48 @@ module PriceStore {
             return v;
         }
         return Config.DEFAULT_CENA;
+    }
+
+    // Spalanie auta [l/100 km]. Kolejnosc wazna:
+    //  1) linia "spalanie=" z pobranego pliku - to jedyna droga, zeby zmienic
+    //     wartosc w apce wgranej recznie (sideload nie widzi ustawien z telefonu),
+    //  2) ustawienie z telefonu / properties.xml,
+    //  3) wartosc z Config.mc.
+    function spalanie() as Lang.Float {
+        var v = liczbaZeStorage(KEY_SPALANIE);
+        if (v != null && v > 0.0 && v < 50.0) {
+            return v;
+        }
+        var p = liczbaZUstawien("spalanie");
+        if (p != null && p > 0.0 && p < 50.0) {
+            return p;
+        }
+        return Config.DEFAULT_SPALANIE;
+    }
+
+    // Cel oszczednosci na przejazd [zl]; 0 = pasek postepu sie nie rysuje.
+    function cel() as Lang.Float {
+        var v = liczbaZeStorage(KEY_CEL);
+        if (v != null && v >= 0.0) {
+            return v;
+        }
+        var p = liczbaZUstawien("celZl");
+        if (p != null && p >= 0.0) {
+            return p;
+        }
+        return Config.DEFAULT_CEL;
+    }
+
+    // (w module nie ma "hidden" - to pomocnicza, nie wolaj jej z zewnatrz)
+    function liczbaZeStorage(klucz as Lang.String) as Lang.Float or Null {
+        try {
+            var v = Storage.getValue(klucz);
+            if (v instanceof Lang.Float || v instanceof Lang.Number || v instanceof Lang.Double) {
+                return v.toFloat();
+            }
+        } catch (e) {
+        }
+        return null;
     }
 
     function dataCeny() as Lang.String or Null {

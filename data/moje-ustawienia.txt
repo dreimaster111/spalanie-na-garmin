@@ -1,0 +1,17 @@
+# Moje ustawienia pola danych.
+#
+# Ten plik edytujesz RECZNIE (na GitHubie albo lokalnie) - bot go nie rusza.
+# Skrypt fetch_pb95.py dokleja te linie do data/pb95.txt, czyli do pliku,
+# ktory zegarek i tak pobiera co 6 h. Dzieki temu zmieniasz te wartosci
+# BEZ przekompilowywania i wgrywania apki przez kabel.
+#
+# Zmiana zadziala, gdy przeleci workflow (2x dziennie albo recznie
+# z zakladki Actions), a potem zegarek pobierze cene.
+#
+# Linie zaczynajace sie od # sa pomijane. Kropka jako separator dziesietny.
+
+# Srednie spalanie auta, z ktorym porownujemy jazde rowerem [l/100 km]
+spalanie=7.0
+
+# Cel oszczednosci na jeden przejazd [zl] - do paska postepu; 0 = bez paska
+cel=15

@@ -133,33 +133,22 @@ class PriceFetcher {
 
     // --- parsowanie -----------------------------------------------------
 
-    // Bierzemy OSTATNIA niepusta linie pliku (dzieki temu dziala tez plik
-    // z historia, gdzie najnowszy dzien jest na koncu).
+    // Pobrany plik ma linie dwoch rodzajow:
+    //
+    //     2026-08-09,7.25     <- cena (liczy sie OSTATNIA taka linia, wiec
+    //                            plik z cala historia tez zadziala)
+    //     spalanie=6.4        <- moje ustawienia, dopisywane przez skrypt
+    //     cel=20              <- z data/moje-ustawienia.txt w repo
+    //
+    // Dzieki temu spalanie i cel zmieniam edytujac plik na GitHubie, bez
+    // przekompilowywania - przy wgraniu recznym (sideload) ustawienia
+    // z telefonu i tak nie dzialaja.
     hidden function zapisz(tekst as Lang.String) as Lang.Boolean {
-        var linia = ostatniaLinia(tekst);
-        if (linia == null || linia.length() < 12) {
-            return false;
-        }
-        // format sztywny: YYYY-MM-DD<separator>cena
-        var data = linia.substring(0, 10);
-        var reszta = linia.substring(11, linia.length());
-        reszta = przecinekNaKropke(reszta);
-        var cena = reszta.toFloat();
-        if (cena == null || cena <= 0.0 || cena > 100.0) {
-            return false;
-        }
-        try {
-            Storage.setValue(PriceStore.KEY_CENA, cena);
-            Storage.setValue(PriceStore.KEY_DATA, data);
-            Storage.setValue(PriceStore.KEY_POBRANO, Time.now().value());
-        } catch (e) {
-            return false;
-        }
-        return true;
-    }
+        var data = null;
+        var cena = null;
+        var spalanie = null;
+        var cel = null;
 
-    hidden function ostatniaLinia(tekst as Lang.String) as Lang.String or Null {
-        var wynik = null;
         var reszta = tekst;
         while (reszta != null && reszta.length() > 0) {
             var nl = reszta.find("\n");
@@ -172,11 +161,61 @@ class PriceFetcher {
                 reszta = "";
             }
             linia = bezBialych(linia);
+
             if (linia.length() >= 12 && linia.substring(4, 5).equals("-")) {
-                wynik = linia;
+                // format sztywny: YYYY-MM-DD<separator>cena
+                var c = przecinekNaKropke(linia.substring(11, linia.length())).toFloat();
+                if (c != null && c > 0.0 && c < 100.0) {
+                    data = linia.substring(0, 10);
+                    cena = c;
+                }
+            } else if (zaczynaSie(linia, "spalanie=")) {
+                var s = wartoscPo(linia, 9);
+                if (s != null && s > 0.0 && s < 50.0) {
+                    spalanie = s;
+                }
+            } else if (zaczynaSie(linia, "cel=")) {
+                var t = wartoscPo(linia, 4);
+                if (t != null && t >= 0.0 && t <= 1000.0) {
+                    cel = t;
+                }
             }
         }
-        return wynik;
+
+        if (cena == null) {
+            return false;
+        }
+        try {
+            Storage.setValue(PriceStore.KEY_CENA, cena);
+            Storage.setValue(PriceStore.KEY_DATA, data);
+            Storage.setValue(PriceStore.KEY_POBRANO, Time.now().value());
+            // Brak linii w pliku = kasujemy zapamietana wartosc i wracamy
+            // do ustawien/Config, zamiast trzymac starocie w nieskonczonosc.
+            zapiszLubSkasuj(PriceStore.KEY_SPALANIE, spalanie);
+            zapiszLubSkasuj(PriceStore.KEY_CEL, cel);
+        } catch (e) {
+            return false;
+        }
+        return true;
+    }
+
+    hidden function zaczynaSie(s as Lang.String, przedrostek as Lang.String) as Lang.Boolean {
+        if (s.length() < przedrostek.length()) {
+            return false;
+        }
+        return s.substring(0, przedrostek.length()).equals(przedrostek);
+    }
+
+    hidden function wartoscPo(linia as Lang.String, od as Lang.Number) as Lang.Float or Null {
+        return przecinekNaKropke(bezBialych(linia.substring(od, linia.length()))).toFloat();
+    }
+
+    hidden function zapiszLubSkasuj(klucz as Lang.String, wartosc) as Void {
+        if (wartosc == null) {
+            Storage.deleteValue(klucz);
+        } else {
+            Storage.setValue(klucz, wartosc);
+        }
     }
 
     hidden function bezBialych(s as Lang.String) as Lang.String {

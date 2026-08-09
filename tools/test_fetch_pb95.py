@@ -32,6 +32,7 @@ def zaladuj(katalog):
     spec.loader.exec_module(m)
     m.PLIK_CENA = os.path.join(katalog, "pb95.txt")
     m.PLIK_HISTORIA = os.path.join(katalog, "pb95-historia.csv")
+    m.PLIK_USTAWIEN = os.path.join(katalog, "moje-ustawienia.txt")
     return m
 
 
@@ -40,14 +41,23 @@ def przygotuj(katalog, data, cena):
         f.write("%s,%.2f\n" % (data, cena))
 
 
-def przypadek(nazwa, plik_na_starcie, wynik_zrodel, oczekiwany_kod, oczekiwany_plik):
+def przygotuj_ustawienia(katalog, tresc):
+    with open(os.path.join(katalog, "moje-ustawienia.txt"), "w", newline="\n") as f:
+        f.write(tresc)
+
+
+def przypadek(nazwa, plik_na_starcie, wynik_zrodel, oczekiwany_kod, oczekiwany_plik,
+              ustawienia=None):
     """
     plik_na_starcie - (data, cena) juz lezace w repo albo None
     wynik_zrodel    - co ma zwrocic pobierz_cene(): (cena, data, zrodlo)
+    ustawienia      - tresc data/moje-ustawienia.txt albo None
     """
     with tempfile.TemporaryDirectory() as kat:
         if plik_na_starcie:
             przygotuj(kat, plik_na_starcie[0], plik_na_starcie[1])
+        if ustawienia is not None:
+            przygotuj_ustawienia(kat, ustawienia)
         m = zaladuj(kat)
         m.pobierz_cene = lambda: wynik_zrodel
 
@@ -98,6 +108,26 @@ def main():
         przypadek("swieza cena -> zapis",
                   (wczoraj, 7.25), (7.40, dzis, "test"),
                   0, "%s,7.40" % dzis),
+
+        # Moje ustawienia doklejane do pliku dla zegarka.
+        przypadek("ustawienia doklejone do ceny",
+                  (wczoraj, 7.25), (7.40, dzis, "test"),
+                  0, "%s,7.40\nspalanie=6.4\ncel=20" % dzis,
+                  ustawienia="# komentarz\nspalanie=6.4\ncel=20\n"),
+
+        # Literowka w recznie edytowanym pliku nie moze wjechac na zegarek
+        # ani wywrocic aktualizacji ceny.
+        przypadek("smieci w ustawieniach pomijane",
+                  (wczoraj, 7.25), (7.40, dzis, "test"),
+                  0, "%s,7.40\nspalanie=6.4" % dzis,
+                  ustawienia="spalanie=6.4\nspalanei=9\ncel=duzo\n"),
+
+        # Bez swiezej ceny plik i tak trzeba przepisac, zeby zmiana ustawien
+        # dojechala do zegarka - z NIEZMIENIONA cena i data.
+        przypadek("brak zrodel -> ustawienia i tak dojezdzaja",
+                  (wczoraj, 7.25), (None, None, None),
+                  0, "%s,7.25\nspalanie=6.4" % wczoraj,
+                  ustawienia="spalanie=6.4\n"),
     ]
 
     print("\n%d/%d przypadkow OK" % (sum(wyniki), len(wyniki)))

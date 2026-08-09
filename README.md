@@ -116,9 +116,36 @@ adresie i sam rozkoduje base64 (tak jak widget wagi).
 | Token GitHub | (puste) | tylko dla repo prywatnego |
 
 **Uwaga:** ustawienia z telefonu (aplikacja Connect IQ) działają tylko dla apek
-zainstalowanych ze sklepu CIQ. Przy wgraniu ręcznym (sideload) liczą się
-wartości z `source/Config.mc` — tam wpisujesz swoje i przekompilowujesz.
-W symulatorze ustawienia działają: *File → Edit Application.Properties*.
+zainstalowanych ze sklepu CIQ. Przy wgraniu ręcznym (sideload) telefon ich nie
+pokaże. W symulatorze działają: *File → Edit Application.Properties*.
+
+### Zmiana spalania i celu bez rekompilacji
+
+Żeby dało się je zmieniać mimo sideloadu, spalanie i cel jadą **tym samym
+plikiem, co cena**. Edytujesz `data/moje-ustawienia.txt` (bot go nie rusza):
+
+```
+spalanie=6.4
+cel=20
+```
+
+`fetch_pb95.py` dokleja te linie do `data/pb95.txt`, więc zegarek dostaje:
+
+```
+2026-08-09,7.25
+spalanie=6.4
+cel=20
+```
+
+Zmiana działa po przeleceniu workflow (2× dziennie albo ręcznie z *Actions*)
+i kolejnym pobraniu przez zegarek. Klucze spoza białej listy i wartości, które
+nie są liczbą, są pomijane — literówka w ręcznie edytowanym pliku nie wjedzie
+na zegarek ani nie wywróci aktualizacji ceny. Plik dla zegarka jest przepisywany
+także wtedy, gdy ceny nie udało się odświeżyć, żeby zmiana ustawień dojechała
+niezależnie od tego, czy serwisy z cenami akurat działają.
+
+Kolejność źródeł w apce: **pobrany plik → ustawienia z telefonu → `Config.mc`**.
+Plik wygrywa, bo przy sideloadzie jest jedyną drogą, żeby cokolwiek zmienić.
 
 ## Struktura
 

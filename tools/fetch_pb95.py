@@ -39,6 +39,11 @@ import urllib.request
 KATALOG = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLIK_CENA = os.path.join(KATALOG, "data", "pb95.txt")
 PLIK_HISTORIA = os.path.join(KATALOG, "data", "pb95-historia.csv")
+PLIK_USTAWIEN = os.path.join(KATALOG, "data", "moje-ustawienia.txt")
+
+# Klucze, ktore wolno przepuscic z moje-ustawienia.txt do pliku dla zegarka.
+# Bialalista, zeby literowka w recznie edytowanym pliku nie wjechala na zegarek.
+DOZWOLONE_USTAWIENIA = ("spalanie", "cel")
 
 NAGLOWKI = {
     "User-Agent": (
@@ -211,12 +216,52 @@ def wiek_w_dniach(data_iso):
     return (datetime.date.today() - d).days
 
 
-def zapisz(cena, data, zrodlo):
-    os.makedirs(os.path.dirname(PLIK_CENA), exist_ok=True)
+def wczytaj_moje_ustawienia():
+    """
+    Czyta data/moje-ustawienia.txt (edytowany recznie) i zwraca liste linii
+    "klucz=wartosc" do doklejenia do pliku dla zegarka. Bledne linie pomija -
+    plik jest edytowany palcami, wiec nie moze wywrocic aktualizacji ceny.
+    """
+    if not os.path.exists(PLIK_USTAWIEN):
+        return []
+    linie = []
+    with open(PLIK_USTAWIEN, "r", encoding="utf-8", errors="ignore") as f:
+        for surowa in f:
+            surowa = surowa.strip()
+            if not surowa or surowa.startswith("#") or "=" not in surowa:
+                continue
+            klucz, wartosc = surowa.split("=", 1)
+            klucz = klucz.strip()
+            if klucz not in DOZWOLONE_USTAWIENIA:
+                print("  pomijam nieznane ustawienie: %s" % klucz, file=sys.stderr)
+                continue
+            liczba = na_float(wartosc)
+            if liczba is None:
+                print("  pomijam %s - '%s' to nie liczba" % (klucz, wartosc.strip()),
+                      file=sys.stderr)
+                continue
+            linie.append("%s=%s" % (klucz, ("%.2f" % liczba).rstrip("0").rstrip(".")))
+    return linie
 
-    # 1) plik dla zegarka - jedna krotka linia
+
+def zapisz_dla_zegarka(cena, data):
+    """
+    Plik, ktory pobiera zegarek: linia z cena + moje ustawienia.
+    Wolamy to takze wtedy, gdy ceny nie udalo sie odswiezyc - inaczej zmiana
+    spalania czy celu nie dojechalaby do zegarka az do nastepnej nowej ceny.
+    """
+    os.makedirs(os.path.dirname(PLIK_CENA), exist_ok=True)
+    ustawienia = wczytaj_moje_ustawienia()
     with open(PLIK_CENA, "w", encoding="ascii", newline="\n") as f:
         f.write("%s,%.2f\n" % (data, cena))
+        for linia in ustawienia:
+            f.write(linia + "\n")
+    if ustawienia:
+        print("Doklejone ustawienia: %s" % ", ".join(ustawienia))
+
+
+def zapisz(cena, data, zrodlo):
+    zapisz_dla_zegarka(cena, data)
 
     # 2) historia - jeden wpis na dzien (nowszy nadpisuje starszy)
     historia = wczytaj_historie()
@@ -250,6 +295,9 @@ def main():
             print("To juz ponad %d dni - scraper zapewne wymaga poprawki."
                   % MAX_DNI_STAROSCI, file=sys.stderr)
             return 1
+        # cena zostaje ta sama, ale ustawienia moga sie zmienic
+        if not args.dry_run:
+            zapisz_dla_zegarka(stara_cena, stara_data)
         return 0
 
     # Serwis oddal cene starsza niz ta, ktora juz mamy (np. zacieta kopia
@@ -257,6 +305,8 @@ def main():
     if stara_data is not None and data < stara_data:
         print("Zrodlo podalo cene z %s, a mamy juz swiezsza z %s - zostawiam bez zmian."
               % (data, stara_data))
+        if not args.dry_run:
+            zapisz_dla_zegarka(stara_cena, stara_data)
         return 0
 
     if args.dry_run:

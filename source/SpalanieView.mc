@@ -55,6 +55,9 @@ class SpalanieView extends WatchUi.DataField {
         mLicznik = mLicznik + 1;
         if (mLicznik % 15 == 0) {
             odczytajCene();
+            // spalanie i cel tez moga przyjsc z pobranego pliku, wiec
+            // odswiezamy je razem z cena - zmiana zadziala jeszcze w tej jezdzie
+            wczytajUstawienia();
             sprobujPobrac();
         }
         if (mLicznik == 3) {
@@ -92,19 +95,9 @@ class SpalanieView extends WatchUi.DataField {
     }
 
     hidden function wczytajUstawienia() as Void {
-        var s = PriceStore.liczbaZUstawien("spalanie");
-        if (s != null && s > 0.0 && s < 50.0) {
-            mSpalanie = s;
-        } else {
-            mSpalanie = Config.DEFAULT_SPALANIE;
-        }
-
-        var c = PriceStore.liczbaZUstawien("celZl");
-        if (c != null && c >= 0.0) {
-            mCel = c;
-        } else {
-            mCel = Config.DEFAULT_CEL;
-        }
+        // Kolejnosc zrodel rozstrzyga PriceStore: pobrany plik > telefon > Config.
+        mSpalanie = PriceStore.spalanie();
+        mCel = PriceStore.cel();
     }
 
     hidden function wczytajTeksty() as Void {
