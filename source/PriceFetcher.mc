@@ -29,6 +29,13 @@ class PriceFetcher {
     hidden var mZajety as Lang.Boolean = false;
     hidden var mWTle as Lang.Boolean = false;
 
+    // Ustawiane, gdy urzadzenie w ogole nie pozwala tej instancji siegac do
+    // sieci - wtedy przestajemy probowac. Dotyczy pola danych na pierwszym
+    // planie na CIQ < 7.0: bezposredni dostep do Communications dostaly pola
+    // danych dopiero w System 7 (SDK 7.0.0), a fenix 6X ma CIQ 3.4.5.
+    // Na starszych zegarkach cene przynosi wylacznie usluga w tle.
+    hidden var mBezSieci as Lang.Boolean = false;
+
     // wTle = true, gdy pobieranie odpala usluga w tle (musi zakonczyc sie
     // wywolaniem Background.exit, inaczej system ubije ja po 30 s)
     function initialize(wTle as Lang.Boolean) {
@@ -48,7 +55,7 @@ class PriceFetcher {
     }
 
     function pobierz() as Lang.Boolean {
-        if (mZajety) {
+        if (mZajety || mBezSieci) {
             return false;
         }
         // bez telefonu w zasiegu nie ma sensu probowac
@@ -85,8 +92,13 @@ class PriceFetcher {
         try {
             Communications.makeWebRequest(url, null, opcje, method(:onOdpowiedz));
         } catch (e) {
+            // Na CIQ < 7.0 pole danych dostanie tu wyjatek - nie ma sensu
+            // probowac co 15 s, robota i tak nalezy do uslugi w tle.
             mZajety = false;
-            zapiszBlad("brak sieci");
+            mBezSieci = true;
+            if (!PriceStore.zSieci()) {
+                zapiszBlad("czekam na tlo");
+            }
             return false;
         }
         return true;

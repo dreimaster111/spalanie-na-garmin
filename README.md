@@ -113,12 +113,20 @@ data/pb95.txt             # to, co czyta zegarek
 
 ### Dlaczego usługa w tle, a nie zwykłe pobieranie
 
-Cena zmienia się raz na dobę, a w trakcie jazdy telefon bywa poza zasięgiem.
-Usługa w tle (`PriceService`) budzi się co godzinę, sprawdza czy cena jest
-starsza niż 6 h i tylko wtedy sięga do sieci — dzięki temu wartość jest gotowa,
-zanim wsiądziesz na rower. Dodatkowo pole danych próbuje pobrać cenę na starcie
-treningu (3. sekunda) i co 15 s, jeśli nadal jest stara. Obie ścieżki piszą do
-tego samego `Storage`, więc niezależnie od tego, która zadziała, wynik jest ten sam.
+**Na fenixie 6X to jedyna działająca droga.** Pola danych dostały bezpośredni
+dostęp do modułu `Communications` dopiero w **Connect IQ System 7** (changelog
+SDK v7.0.0.beta1: *„Allow data fields to use the Communications module […]
+without having to use backgrounding"*). Fenix 6X Pro ma CIQ **3.4.5**, więc
+obowiązuje go starsza zasada z FAQ SDK: *„a watch face or data field that can't
+do communications itself, but the background process can"*.
+
+Dlatego cenę przynosi `PriceService`: budzi się co godzinę, sprawdza czy cena
+jest starsza niż 6 h i tylko wtedy sięga do sieci — wartość jest gotowa, zanim
+wsiądziesz na rower. Pole danych dodatkowo próbuje pobrać cenę samo (3. sekunda
+treningu i co 15 s) — to zadziała dopiero na fenixie 8; na 6X pierwsza próba
+kończy się wyjątkiem, po którym `PriceFetcher` ustawia `mBezSieci` i przestaje
+zawracać głowę. Obie ścieżki piszą do tego samego `Storage`, więc wynik jest
+ten sam niezależnie od tego, która zadziałała.
 
 Cała klasa aplikacji, usługa i `PriceFetcher` są oznaczone `(:background)` —
 inaczej kompilator nie wpuściłby ich do 32-kilobajtowej puli pamięci tła.
@@ -143,6 +151,10 @@ fenix847mm, fenix8solar47mm, fenix8solar51mm.
 
 - Pobieranie wymaga połączenia z telefonem (Bluetooth). Bez niego pole liczy
   po ostatniej zapisanej cenie — data w stopce pokazuje, jak stara jest.
+- Na fenixie 6X cena przychodzi **wyłącznie** z usługi w tle (patrz wyżej),
+  a system sam decyduje, kiedy ją obudzić. Pierwszy raz cena może więc pojawić
+  się dopiero po godzinie od zainstalowania pola — do tego czasu stopka pokazuje
+  cenę awaryjną i `?`.
 - Serwisy z cenami to strony WWW, nie API — mogą zmienić układ. Wtedy poprawia
   się jeden regex w `tools/fetch_pb95.py`, bez ruszania kodu na zegarku.
 - Cena to **średnia krajowa**, nie cena Twojej stacji.
