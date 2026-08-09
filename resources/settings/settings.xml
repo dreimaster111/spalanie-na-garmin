@@ -1,0 +1,14 @@
+<settings>
+    <setting propertyKey="@Properties.spalanie" title="@Strings.SpalanieTitle">
+        <settingConfig type="numeric" min="1" max="30"/>
+    </setting>
+    <setting propertyKey="@Properties.cenaAwaryjna" title="@Strings.CenaTitle">
+        <settingConfig type="numeric" min="1" max="30"/>
+    </setting>
+    <setting propertyKey="@Properties.adresCeny" title="@Strings.UrlTitle">
+        <settingConfig type="alphaNumeric" maxLength="512"/>
+    </setting>
+    <setting propertyKey="@Properties.token" title="@Strings.TokenTitle">
+        <settingConfig type="alphaNumeric" maxLength="512"/>
+    </setting>
+</settings>

@@ -1,0 +1,14 @@
+# wyniki kompilacji
+bin/
+gen/
+mir/
+internal-mir/
+*.prg
+*.prg.debug.xml
+
+# klucz dewelopera NIE trafia do repo
+developer_key.der
+*.pem
+
+__pycache__/
+*.pyc

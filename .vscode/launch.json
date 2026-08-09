@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "monkeyc",
+            "request": "launch",
+            "name": "Fenix 6X Pro",
+            "device": "fenix6xpro"
+        },
+        {
+            "type": "monkeyc",
+            "request": "launch",
+            "name": "Fenix 8 47mm",
+            "device": "fenix847mm"
+        }
+    ]
+}

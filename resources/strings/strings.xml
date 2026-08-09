@@ -1,0 +1,11 @@
+<strings>
+    <string id="AppName">Oszczędność paliwa</string>
+    <string id="FieldLabel">Oszczędność</string>
+    <string id="UnitZl">zł</string>
+    <string id="UnitZlL">zł/l</string>
+
+    <string id="SpalanieTitle">Spalanie auta [l/100 km]</string>
+    <string id="CenaTitle">Cena awaryjna [zł/l]</string>
+    <string id="UrlTitle">Adres pliku z ceną</string>
+    <string id="TokenTitle">Token GitHub (repo prywatne)</string>
+</strings>
