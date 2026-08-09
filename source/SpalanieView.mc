@@ -32,6 +32,8 @@ class SpalanieView extends WatchUi.DataField {
     hidden var mEtykieta as Lang.String = "PLN";
     hidden var mZl as Lang.String = "zl";
     hidden var mZlL as Lang.String = "zl/l";
+    hidden var mL as Lang.String = "l";
+    hidden var mKgCo2 as Lang.String = "kg CO2";
 
     function initialize() {
         DataField.initialize();
@@ -105,6 +107,8 @@ class SpalanieView extends WatchUi.DataField {
             mEtykieta = WatchUi.loadResource(Rez.Strings.FieldLabel);
             mZl = WatchUi.loadResource(Rez.Strings.UnitZl);
             mZlL = WatchUi.loadResource(Rez.Strings.UnitZlL);
+            mL = WatchUi.loadResource(Rez.Strings.UnitL);
+            mKgCo2 = WatchUi.loadResource(Rez.Strings.UnitKgCo2);
         } catch (e) {
         }
     }
@@ -201,13 +205,74 @@ class SpalanieView extends WatchUi.DataField {
             dol = by - 3;
         }
 
+        // drugi wiersz: ile litrow paliwa i ile CO2 nie poszlo w powietrze.
+        // Dystansu ani czasu tu nie dubluje - te sa na kazdym innym ekranie;
+        // to ma pokazywac to, czego nie widac nigdzie indziej.
+        if (dol - gora - maleH >= minKwota) {
+            var litryTxt = kropkaNaPrzecinek(mLitry.format("%.1f")) + " " + mL;
+            var co2Txt = kropkaNaPrzecinek((mLitry * Config.CO2_NA_LITR).format("%.1f"))
+                         + " " + mKgCo2;
+            var mieszczaSie =
+                dc.getTextWidthInPixels(litryTxt, Graphics.FONT_XTINY) <= w / 2 - 4
+                && dc.getTextWidthInPixels(co2Txt, Graphics.FONT_XTINY) <= w / 2 - 4;
+            if (mieszczaSie) {
+                dc.setColor(koloSzary, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(w / 4, dol - maleH, Graphics.FONT_XTINY, litryTxt,
+                            Graphics.TEXT_JUSTIFY_CENTER);
+                dc.drawText(3 * w / 4, dol - maleH, Graphics.FONT_XTINY, co2Txt,
+                            Graphics.TEXT_JUSTIFY_CENTER);
+                dol = dol - maleH;
+            }
+        }
+
         // glowna wartosc - na zielono, gdy cel przejazdu dowieziony
-        var tekst = kwota(mZlote) + " " + mZl;
-        var wolneH = dol - gora;
-        var font = dobierzFont(dc, tekst, w - 4, wolneH);
-        dc.setColor(celOsiagniety ? Graphics.COLOR_GREEN : kolor,
-                    Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w / 2, gora + wolneH / 2, font, tekst,
+        rysujKwote(dc, w / 2, gora + (dol - gora) / 2, w - 4, dol - gora,
+                   celOsiagniety ? Graphics.COLOR_GREEN : kolor);
+    }
+
+    // Duza kwota zlozona z dwoch kawalkow: calosc grubym fontem CYFROWYM,
+    // a koncowka z przecinkiem i "zl" mniejszym fontem tekstowym, przyklejona
+    // do dolnej krawedzi. Fonty FONT_NUMBER_* sa duzo wieksze od tekstowych,
+    // ale maja tylko cyfry - stad ten podzial zamiast rezygnacji z nich.
+    hidden function rysujKwote(dc as Graphics.Dc, srodekX as Lang.Number,
+                               srodekY as Lang.Number, maxW as Lang.Number,
+                               maxH as Lang.Number, kolor) as Void {
+        var s = kwota(mZlote);
+        var i = s.find(",");
+        var duzy = (i == null) ? s : s.substring(0, i);
+        var maly = ((i == null) ? "" : s.substring(i, s.length())) + " " + mZl;
+
+        var duzeFonty = [
+            Graphics.FONT_NUMBER_HOT,
+            Graphics.FONT_NUMBER_MEDIUM,
+            Graphics.FONT_NUMBER_MILD
+        ];
+        for (var k = 0; k < duzeFonty.size(); k++) {
+            var fd = duzeFonty[k];
+            var hd = dc.getFontHeight(fd);
+            if (hd > maxH) {
+                continue;
+            }
+            var fm = (hd >= 44) ? Graphics.FONT_SMALL : Graphics.FONT_XTINY;
+            var wd = dc.getTextWidthInPixels(duzy, fd);
+            var wm = dc.getTextWidthInPixels(maly, fm);
+            if (wd + wm > maxW) {
+                continue;
+            }
+            var x0 = srodekX - (wd + wm) / 2;
+            dc.setColor(kolor, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(x0, srodekY, fd, duzy,
+                        Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(x0 + wd, srodekY + hd / 2 - dc.getFontHeight(fm),
+                        fm, maly, Graphics.TEXT_JUSTIFY_LEFT);
+            return;
+        }
+
+        // Kafel za maly na font cyfrowy - caly napis jednym fontem tekstowym.
+        var tekst = s + " " + mZl;
+        var font = dobierzFont(dc, tekst, maxW, maxH);
+        dc.setColor(kolor, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(srodekX, srodekY, font, tekst,
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 

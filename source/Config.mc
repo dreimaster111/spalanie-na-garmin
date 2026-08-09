@@ -28,6 +28,11 @@ module Config {
     // 0 = pasek w ogole sie nie rysuje.
     const DEFAULT_CEL = 15.0;
 
+    // Ile kg CO2 daje spalenie litra benzyny. 2,31 kg/l to wartosc przyjmowana
+    // powszechnie dla benzyny silnikowej (sam dwutlenek ze spalania, bez
+    // produkcji i transportu paliwa).
+    const CO2_NA_LITR = 2.31;
+
     // Co ile sekund odswiezac cene (cena zmienia sie raz na dobe, wiec 6 h
     // z zapasem wystarcza). Usluga w tle budzi sie czesciej, ale jesli cena
     // jest swieza - natychmiast konczy prace.
