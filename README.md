@@ -8,17 +8,49 @@ pobieranej z internetu.
 oszczędność [zł] = dystans [km] / 100 × spalanie auta [l/100 km] × cena Pb95 [zł/l]
 ```
 
-Na ekranie:
+Na ekranie (pole na cały ekran, czyli układ z jednym polem danych):
 
 ```
-      Oszczędność        <- etykieta (gdy kafelek jest wystarczająco wysoki)
-        12,34 zł         <- wartość, font dobierany do rozmiaru kafelka
-     7,25 zł/l 09.08     <- użyta cena i dzień, z którego pochodzi
+         Oszczędność            <- etykieta
+                                
+           12,34 zł             <- kwota największym fontem, jaki wchodzi
+                                
+      0,2 l    0,6 kg CO2       <- czego nie spaliliśmy
+       7,32 zł/l 14.08          <- użyta cena i dzień, z którego pochodzi
+   \_________________/          <- łuk postępu do celu, po dolnym obrzeżu
 ```
+
+W wąskim kafelku (2, 3, 4 pola na ekranie) ten sam kod składa się do jednego
+wiersza z kwotą, a z ozdób zostaje to, co się zmieści — łuk zamienia się wtedy
+w zwykły poziomy pasek, bo potrzebuje całej tarczy.
 
 Stopka na pomarańczowo + `?` = cena z internetu jeszcze nie dotarła, liczone
 po cenie awaryjnej z ustawień. Zamiast daty może pojawić się krótki powód
 (`brak telefonu`, `HTTP 404`).
+
+### Okrągły ekran to nie prostokąt
+
+Pole danych dostaje do rysowania **prostokąt**, ale na fenixie widać z niego
+tylko to, co wpada w okrąg tarczy — z kafla 280×280 to 61 000 z 78 000 pikseli.
+Napis dosunięty do dolnej krawędzi albo do boku zostaje więc obcięty przez
+obrzeże, mimo że mieści się w `dc.getWidth()`.
+
+Dlatego przy układzie na cały ekran szerokość każdego wiersza liczymy z
+**cięciwy koła** na jego wysokości, a nie z szerokości kafla, i tak samo
+dobieramy wysokość, na której siada etykieta i stopka. Że kafel to cały ekran,
+poznajemy po `getObscurityFlags()` — gdy tarcza przycina wszystkie cztery
+krawędzie, wiadomo na pewno, że środek koła leży w środku kafla, a promień to
+połowa jego szerokości.
+
+Dla wąskich pasów tej pewności nie ma: `OBSCURE_TOP` mówi tylko, że górne rogi
+pasa są ścięte, ale nie o ile pas jest odsunięty od góry ekranu — a bez tego
+środka koła nie da się umiejscowić. Pasy zostają więc przy prostokącie.
+
+Łuk postępu jest przy okazji efektem ubocznym tej geometrii: obrzeże tarczy to
+jedyne miejsce, gdzie duży wskaźnik nie zabiera pola głównej liczbie. Kąt 0°
+jest na godzinie 3 i rośnie przeciwnie do wskazówek zegara, więc dolne półkole
+to `drawArc(..., ARC_COUNTER_CLOCKWISE, 180, 359)` — wypełnienie płynie od
+9:00 przez 6:00 do 3:00.
 
 ## Skąd bierze się cena
 
@@ -154,7 +186,7 @@ manifest.xml              # datafield, fenix6xpro + fenix6pro/6spro + fenix8; up
 monkey.jungle
 source/
   SpalanieApp.mc          # AppBase: widok + rejestracja usługi w tle
-  SpalanieView.mc         # rysowanie pola danych (GDI-owe onUpdate, font dobierany do kafelka)
+  SpalanieView.mc         # rysowanie pola (onUpdate: geometria tarczy, luk, font do kafelka)
   PriceService.mc         # ServiceDelegate — budzony przez system co godzinę
   PriceFetcher.mc         # makeWebRequest + parsowanie linii "data,cena"
   PriceStore.mc           # wspólny dostęp do Storage i do ustawień
