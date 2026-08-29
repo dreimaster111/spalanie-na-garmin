@@ -263,10 +263,10 @@ def poprzednia_inna_cena(cena, data):
     return None
 
 
-def historia_dla_zegarka(data, ile=14):
+def historia_dla_zegarka(data, ile=7):
     """
     Ostatnie `ile` cen Pb95 z historii (po dacie rosnaco, nie nowsze niz
-    `data`) jako tekst "6.50,6.52,...". Zegarek rysuje z tego mini-wykres.
+    `data`) jako tekst "6.50,6.52,...". Zegarek rysuje z tego slupki.
     """
     historia = wczytaj_historie()
     ceny = []

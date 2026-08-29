@@ -571,9 +571,11 @@ class SpalanieView extends WatchUi.DataField {
         rysujHistorie(dc, yRaz + maleH + 3, yStopka - 3, ciemno, koloSzary);
     }
 
-    // Sparkline cen: linia znormalizowana do min/max historii, kropka na
-    // ostatniej cenie w kolorze trendu. Rysuje sie tylko, gdy jest >= 12 px
-    // wysokosci - w mniejszych kaflach po prostu znika.
+    // Slupki cen z ostatniego tygodnia. Zeby male roznice (grosze) bylo
+    // widac, slupki nie startuja od zera, tylko od min historii - kazdy ma
+    // jednak co najmniej 3 px, zeby najtanszy dzien nie znikal. Dzisiejszy
+    // slupek w kolorze trendu, reszta szara. Rysuje sie tylko, gdy w pasie
+    // miedzy "razem" a stopka zostalo >= 12 px.
     hidden function rysujHistorie(dc as Graphics.Dc, gora as Lang.Number,
                                   dol as Lang.Number, ciemno as Lang.Boolean,
                                   koloSzary) as Void {
@@ -582,9 +584,9 @@ class SpalanieView extends WatchUi.DataField {
         if (n < 2 || wys < 12) {
             return;
         }
-        if (wys > 26) {
-            gora = dol - 26;    // wyzszy wykres nic nie wnosi, a odsuwa sie od stopki
-            wys = 26;
+        if (wys > 28) {
+            gora = dol - 28;
+            wys = 28;
         }
 
         var min = mHist[0];
@@ -594,33 +596,27 @@ class SpalanieView extends WatchUi.DataField {
             if (mHist[i] > max) { max = mHist[i]; }
         }
         var zakres = max - min;
-        if (zakres < 0.01) { zakres = 0.01; }   // plaska historia - linia po srodku
+        if (zakres < 0.01) { zakres = 0.01; }
 
         var polS = polSzerokosci(gora, wys) - 12;
         var szer = 2 * polS;
-        if (szer > 130) { szer = 130; }
+        if (szer > 120) { szer = 120; }
         if (szer < 40) { return; }
-        var x0 = mCx - szer / 2;
+        var krok = szer / n;
+        var slupek = krok - 2;
+        if (slupek < 3) { slupek = 3; }
+        var x0 = mCx - (krok * n) / 2;
 
-        dc.setPenWidth(2);
-        dc.setColor(koloSzary, Graphics.COLOR_TRANSPARENT);
-        var poprzX = x0;
-        var poprzY = dol - ((mHist[0] - min) / zakres * wys).toNumber();
-        for (var i = 1; i < n; i++) {
-            var x = x0 + i * szer / (n - 1);
-            var y = dol - ((mHist[i] - min) / zakres * wys).toNumber();
-            dc.drawLine(poprzX, poprzY, x, y);
-            poprzX = x;
-            poprzY = y;
+        for (var i = 0; i < n; i++) {
+            var h = 3 + ((mHist[i] - min) / zakres * (wys - 3)).toNumber();
+            var c = koloSzary;
+            if (i == n - 1) {
+                if (mTrend > 0) { c = Graphics.COLOR_RED; }
+                else if (mTrend < 0) { c = ciemno ? Graphics.COLOR_GREEN : Graphics.COLOR_DK_GREEN; }
+            }
+            dc.setColor(c, Graphics.COLOR_TRANSPARENT);
+            dc.fillRectangle(x0 + i * krok, dol - h, slupek, h);
         }
-        dc.setPenWidth(1);
-
-        // kropka na dzisiejszej cenie w kolorze trendu
-        var kropka = koloSzary;
-        if (mTrend > 0) { kropka = Graphics.COLOR_RED; }
-        if (mTrend < 0) { kropka = ciemno ? Graphics.COLOR_GREEN : Graphics.COLOR_DK_GREEN; }
-        dc.setColor(kropka, Graphics.COLOR_TRANSPARENT);
-        dc.fillCircle(poprzX, poprzY, 3);
     }
 
     // Duza kwota zlozona z dwoch kawalkow: calosc grubym fontem CYFROWYM,
