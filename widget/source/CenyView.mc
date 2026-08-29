@@ -87,15 +87,11 @@ class CenyView extends WatchUi.View {
             dc.fillRectangle((x0 + k * krok).toNumber(), dolW - sh, slupek, sh);
         }
 
-        // min/max po bokach wykresu
+        // zakres pod wykresem, wysrodkowany - boczne etykiety obcinala tarcza
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx - wykresSzer / 2 - 4, dolW - maleH, Graphics.FONT_XTINY,
-                    naPrzecinek(min.format("%.2f")), Graphics.TEXT_JUSTIFY_RIGHT);
-        dc.drawText(cx + wykresSzer / 2 + 4, dolW - wysW, Graphics.FONT_XTINY,
-                    naPrzecinek(max.format("%.2f")), Graphics.TEXT_JUSTIFY_LEFT);
-
-        // podpowiedz na dole
-        dc.drawText(cx, dolW + 6, Graphics.FONT_XTINY, "gora/dol: dni",
+        dc.drawText(cx, dolW + 6, Graphics.FONT_XTINY,
+                    "min " + naPrzecinek(min.format("%.2f"))
+                    + "   max " + naPrzecinek(max.format("%.2f")),
                     Graphics.TEXT_JUSTIFY_CENTER);
     }
 
