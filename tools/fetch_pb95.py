@@ -40,6 +40,7 @@ KATALOG = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLIK_CENA = os.path.join(KATALOG, "data", "pb95.txt")
 PLIK_HISTORIA = os.path.join(KATALOG, "data", "pb95-historia.csv")
 PLIK_USTAWIEN = os.path.join(KATALOG, "data", "moje-ustawienia.txt")
+PLIK_WIDGET = os.path.join(KATALOG, "data", "pb95-widget.txt")
 
 # Klucze, ktore wolno przepuscic z moje-ustawienia.txt do pliku dla zegarka.
 # Bialalista, zeby literowka w recznie edytowanym pliku nie wjechala na zegarek.
@@ -305,6 +306,20 @@ def zapisz_dla_zegarka(cena, data):
         print("Doklejone ustawienia: %s" % ", ".join(ustawienia))
     if poprzednia is not None:
         print("Poprzednia (inna) cena: %.2f" % poprzednia)
+
+    # osobny plik dla widgetu historii: 30 dni z DATAMI (pole danych
+    # dostaje tylko ceny, widget pokazuje tez ktory to byl dzien)
+    historia = wczytaj_historie()
+    linie = []
+    for klucz in sorted(historia):
+        if klucz <= data:
+            czesci = historia[klucz].split(";")
+            c = na_float(czesci[1]) if len(czesci) >= 2 else None
+            if sensowna(c):
+                linie.append("%s,%.2f" % (klucz, c))
+    with open(PLIK_WIDGET, "w", encoding="ascii", newline="\n") as f:
+        for linia in linie[-30:]:
+            f.write(linia + "\n")
 
 
 def zapisz(cena, data, zrodlo):
