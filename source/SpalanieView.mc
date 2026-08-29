@@ -1,6 +1,7 @@
 using Toybox.WatchUi;
 using Toybox.Graphics;
 using Toybox.Activity;
+using Toybox.ActivityMonitor;
 using Toybox.System;
 using Toybox.Lang;
 using Toybox.Math;
@@ -32,6 +33,13 @@ class SpalanieView extends WatchUi.DataField {
     hidden var mFetcher as PriceFetcher?;
     hidden var mLicznik as Lang.Number = 0;
 
+    // Marsz/wedrowka: pokazujemy tez kroki. Pole danych nie widzi krokow
+    // Z AKTYWNOSCI (Garmin ich nie udostepnia), wiec liczymy roznice
+    // dziennego licznika wzgledem stanu z poczatku treningu.
+    hidden var mMarsz as Lang.Boolean = false;
+    hidden var mKrokiStart as Lang.Number = -1;  // -1 = jeszcze nie zlapane
+    hidden var mKroki as Lang.Number = 0;
+
     // Geometria kafla i tarczy - wypelniana raz na klatke w ustawGeometrie().
     // Na okraglym zegarku kafel to prostokat, ale WIDAC z niego tylko to, co
     // wpada w kolo; te pola opisuja wlasnie to kolo w ukladzie kafla.
@@ -41,9 +49,7 @@ class SpalanieView extends WatchUi.DataField {
     hidden var mR as Lang.Number = 0;       // promien obszaru dla tekstu
     hidden var mPolW as Lang.Number = 0;    // polowa szerokosci kafla
     hidden var mKolo as Lang.Boolean = false;
-    hidden var mLuk as Lang.Boolean = false;
-    hidden var mRLuku as Lang.Number = 0;   // promien sciezki luku postepu
-    hidden var mGrubosc as Lang.Number = 8; // grubosc luku
+    hidden var mREkranu as Lang.Number = 0; // promien fizycznej tarczy
 
     hidden var mEtykieta as Lang.String = "PLN";
     hidden var mZl as Lang.String = "zl";
@@ -56,6 +62,23 @@ class SpalanieView extends WatchUi.DataField {
         wczytajTeksty();
         wczytajUstawienia();
         odczytajCene();
+        sprawdzSport();
+    }
+
+    // Czy to aktywnosc piesza? Profil nie zmienia sie w trakcie treningu,
+    // wiec wystarczy sprawdzic raz, przy tworzeniu widoku.
+    hidden function sprawdzSport() as Void {
+        mMarsz = false;
+        try {
+            if (Activity has :getProfileInfo) {
+                var p = Activity.getProfileInfo();
+                if (p != null && p.sport != null) {
+                    mMarsz = (p.sport == Activity.SPORT_WALKING)
+                          || (p.sport == Activity.SPORT_HIKING);
+                }
+            }
+        } catch (e) {
+        }
     }
 
     // --- dane ------------------------------------------------------------
@@ -68,6 +91,25 @@ class SpalanieView extends WatchUi.DataField {
         mKm = m / 1000.0;
         mLitry = mKm * mSpalanie / 100.0;
         mZlote = mLitry * mCena;
+
+        // kroki w marszu: roznica dziennego licznika od startu treningu
+        if (mMarsz) {
+            var czasIdzie = (info has :timerTime) && (info.timerTime != null)
+                && (info.timerTime > 0);
+            var am = ActivityMonitor.getInfo();
+            var dzienne = (am != null && am.steps != null) ? am.steps : null;
+            if (dzienne != null) {
+                if (mKrokiStart < 0 && czasIdzie) {
+                    mKrokiStart = dzienne;
+                }
+                if (mKrokiStart >= 0) {
+                    if (dzienne < mKrokiStart) {
+                        mKrokiStart = dzienne;   // polnoc - dzienny licznik wyzerowany
+                    }
+                    mKroki = dzienne - mKrokiStart;
+                }
+            }
+        }
 
         // Storage czytamy co ~15 s, a nie co sekunde - szkoda pradu i czasu
         mLicznik = mLicznik + 1;
@@ -176,33 +218,24 @@ class SpalanieView extends WatchUi.DataField {
 
         ustawGeometrie(w, h);
 
-        // Luk postepu zjada obrzeze tarczy, wiec liczymy go PRZED tekstem -
-        // to on wyznacza promien, w ktorym musza sie zmiescic napisy.
-        if (mLuk) {
-            rysujLuk(dc, udzial, tlo);
+        // Kafel na caly ekran ma wlasny, bogatszy uklad (strefy);
+        // waskie pasy zostaja przy prostym ukladzie ponizej.
+        if (mKolo) {
+            rysujCalaTarcze(dc, udzial, celOsiagniety, tlo, kolor, koloSzary);
+            return;
         }
 
-        var gora = mKolo ? (mCy - mR) : 0;
-        var dol  = mKolo ? (mCy + mR) : h;
-        if (gora < 0) { gora = 0; }
-        if (dol > h) { dol = h; }
+        var gora = 0;
+        var dol = h;
 
-        // Etykieta u gory: najpierw probujemy przy samej krawedzi obszaru,
-        // a dopiero gdy cieciwa tarczy jest tam za waska - zjezdzamy do
-        // pierwszego wiersza, w ktorym napis sie miesci. Odwrotna kolejnosc
-        // (zawsze licz z cieciwy) marnowalaby wysokosc w waskich kaflach.
+        // Etykieta u gory - w waskim kaflu zawsze przy krawedzi.
         var etykW = dc.getTextWidthInPixels(mEtykieta, Graphics.FONT_XTINY);
-        var yEtyk = gora;
-        if (etykW > 2 * polSzerokosci(yEtyk, maleH)) {
-            yEtyk = yWiersza(etykW, maleH, true);
-            if (yEtyk < gora) { yEtyk = gora; }
-        }
-        if (etykW <= 2 * polSzerokosci(yEtyk, maleH)
-                && (dol - (yEtyk + maleH) >= minKwota)) {
+        if (etykW <= 2 * polSzerokosci(gora, maleH)
+                && (dol - (gora + maleH) >= minKwota)) {
             dc.setColor(koloSzary, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(mCx, yEtyk, Graphics.FONT_XTINY, mEtykieta,
+            dc.drawText(mCx, gora, Graphics.FONT_XTINY, mEtykieta,
                         Graphics.TEXT_JUSTIFY_CENTER);
-            gora = yEtyk + maleH;
+            gora = gora + maleH;
         }
 
         // Stopka: cena i dzien, z ktorego pochodzi. Im dluzszy wariant, tym
@@ -240,7 +273,7 @@ class SpalanieView extends WatchUi.DataField {
         var paskH = h / 14;
         if (paskH < 5) { paskH = 5; }
         if (paskH > 10) { paskH = 10; }
-        if (!mLuk && mCel > 0.0 && (dol - gora - paskH - 6 >= minKwota)) {
+        if (mCel > 0.0 && (dol - gora - paskH - 6 >= minKwota)) {
             var by = dol - paskH - 3;
             var polB = polSzerokosci(by, paskH) - 4;
             if (polB > paskH) {
@@ -338,7 +371,6 @@ class SpalanieView extends WatchUi.DataField {
         mPolW = w / 2 - 2;
         mR = mPolW;
         mKolo = false;
-        mLuk = false;
 
         if (!(System.getDeviceSettings().screenShape == System.SCREEN_SHAPE_ROUND)) {
             return;
@@ -364,17 +396,8 @@ class SpalanieView extends WatchUi.DataField {
 
         var rEkranu = (w < h) ? (w / 2) : (h / 2);
         mKolo = true;
-        mLuk = (mCel > 0.0) && (rEkranu >= 60);
-
-        if (mLuk) {
-            mGrubosc = rEkranu / 11;
-            if (mGrubosc < 6) { mGrubosc = 6; }
-            if (mGrubosc > 16) { mGrubosc = 16; }
-            mRLuku = rEkranu - mGrubosc / 2 - 4;
-            mR = rEkranu - mGrubosc - 8;
-        } else {
-            mR = rEkranu - 4;
-        }
+        mREkranu = rEkranu;
+        mR = rEkranu - 6;
     }
 
     // Polowa szerokosci dostepnej w wierszu [y, y+wys): na okraglej tarczy to
@@ -408,26 +431,136 @@ class SpalanieView extends WatchUi.DataField {
         return gora ? (mCy - dy) : (mCy + dy - wys);
     }
 
-    // Postep jako polkole po dolnej krawedzi tarczy: od 9:00, przez 6:00, do
-    // 3:00. Kat 0 to 3:00, rosnie przeciwnie do wskazowek zegara, wiec dolna
-    // polowke rysujemy od 180 do 360 W KIERUNKU PRZECIWNYM. Na okraglym
-    // ekranie to jedyne miejsce, gdzie duzy wskaznik nie zabiera pola liczbie.
-    hidden function rysujLuk(dc as Graphics.Dc, udzial as Lang.Float, tlo) as Void {
-        dc.setPenWidth(mGrubosc);
+    // Uklad "strefy" dla kafla na caly ekran:
+    //  - gorna czesc tarczy (ponad cieciwa) to ciemnozielona strefa z naglowkiem
+    //    "Oszczednosc · 56%" i wielka kwota; postep dodatkowo plynie cienkim
+    //    zielonym lukiem po gornym obrzezu,
+    //  - pod cieciwa dwie kolumny (litry / CO2) rozdzielone kreska,
+    //  - nizej zloty wiersz "razem", na samym dole cena z trendem.
+    hidden function rysujCalaTarcze(dc as Graphics.Dc, udzial as Lang.Float,
+                                    celOsiagniety as Lang.Boolean, tlo,
+                                    kolor, koloSzary) as Void {
+        var maleH = dc.getFontHeight(Graphics.FONT_XTINY);
+        var ciemno = (tlo == Graphics.COLOR_BLACK);
+        var minKwota = dc.getFontHeight(Graphics.FONT_MEDIUM);
 
-        dc.setColor((tlo == Graphics.COLOR_BLACK)
-                        ? Graphics.COLOR_DK_GRAY
-                        : Graphics.COLOR_LT_GRAY,
-                    Graphics.COLOR_TRANSPARENT);
-        dc.drawArc(mCx, mCy, mRLuku, Graphics.ARC_COUNTER_CLOCKWISE, 180, 359);
+        // cieciwa dzielaca tarcze - lekko nad srodkiem, zeby kwota dostala
+        // wiecej, a dol pomiescil trzy wiersze
+        var yC = mCy - mREkranu / 8;
 
-        if (udzial > 0.0) {
-            var koniec = 180 + (179.0 * udzial).toNumber();
-            if (koniec < 184) { koniec = 184; }   // zeby drgnal juz przy pierwszych metrach
-            dc.setColor(Graphics.COLOR_GREEN, Graphics.COLOR_TRANSPARENT);
-            dc.drawArc(mCx, mCy, mRLuku, Graphics.ARC_COUNTER_CLOCKWISE, 180, koniec);
+        // strefa: wypelniony odcinek kola ponad cieciwa (wielokat po luku)
+        var dy = (mCy - yC).toFloat();
+        var aDeg = Math.toDegrees(Math.asin(dy / mREkranu)).toFloat();
+        var pts = [] as Lang.Array<[Lang.Numeric, Lang.Numeric]>;
+        for (var t = aDeg; t <= 180.0 - aDeg; t += 9.0) {
+            var rad = t * 0.0174533;
+            pts.add([mCx + (Math.cos(rad) * mREkranu).toNumber(),
+                     mCy - (Math.sin(rad) * mREkranu).toNumber()] as [Lang.Numeric, Lang.Numeric]);
         }
-        dc.setPenWidth(1);
+        dc.setColor(ciemno ? 0x005500 : 0xAAFFAA, Graphics.COLOR_TRANSPARENT);
+        dc.fillPolygon(pts);
+
+        // cienki luk postepu po gornym obrzezu strefy: od lewej do prawej
+        if (mCel > 0.0 && udzial > 0.0) {
+            var start = (180.0 - aDeg).toNumber();
+            var koniec = 180.0 - aDeg - (180.0 - 2.0 * aDeg) * udzial;
+            if (koniec > 176.0 - aDeg) { koniec = 176.0 - aDeg; }
+            dc.setPenWidth(6);
+            dc.setColor(Graphics.COLOR_GREEN, Graphics.COLOR_TRANSPARENT);
+            dc.drawArc(mCx, mCy, mREkranu - 3, Graphics.ARC_CLOCKWISE,
+                       start, koniec.toNumber());
+            dc.setPenWidth(1);
+        }
+
+        // naglowek w strefie: etykieta + procent celu
+        var gora = mCy - mR;
+        var naglowek = mEtykieta;
+        if (mCel > 0.0) {
+            naglowek = naglowek + " " + (udzial * 100.0).format("%.0f") + "%";
+        }
+        var nagW = dc.getTextWidthInPixels(naglowek, Graphics.FONT_XTINY);
+        var yNag = yWiersza(nagW, maleH, true);
+        if (yNag < gora) { yNag = gora; }
+        dc.setColor(ciemno ? Graphics.COLOR_GREEN : Graphics.COLOR_DK_GREEN,
+                    Graphics.COLOR_TRANSPARENT);
+        dc.drawText(mCx, yNag, Graphics.FONT_XTINY, naglowek,
+                    Graphics.TEXT_JUSTIFY_CENTER);
+        gora = yNag + maleH;
+
+        // wielka kwota w strefie, nad cieciwa
+        rysujKwote(dc, gora, yC - 2,
+                   celOsiagniety ? Graphics.COLOR_GREEN : kolor);
+
+        // linia cieciwy
+        var polC = polSzerokosci(yC, 1) - 10;
+        dc.setColor(ciemno ? Graphics.COLOR_DK_GRAY : Graphics.COLOR_LT_GRAY,
+                    Graphics.COLOR_TRANSPARENT);
+        dc.drawLine(mCx - polC, yC, mCx + polC, yC);
+
+        // trzy kolumny: przejechane km | litry paliwa | kg CO2, z podpisami
+        var yKol = yC + 4;
+        var polR = polSzerokosci(yKol, 2 * maleH);
+        var xOdstep = 2 * polR / 3;
+        var kmTxt = kropkaNaPrzecinek(mKm.format(mKm < 100.0 ? "%.1f" : "%.0f"));
+        var wartosci;
+        var podpisy;
+        if (mMarsz) {
+            // w marszu litry sa malo ciekawe - w ich miejsce wchodza kroki
+            wartosci = [kmTxt, mKroki.toString(),
+                        kropkaNaPrzecinek((mLitry * Config.CO2_NA_LITR).format("%.1f"))];
+            podpisy = ["km", "krokow", "kg CO2"];
+        } else {
+            wartosci = [kmTxt,
+                        kropkaNaPrzecinek(mLitry.format("%.1f")),
+                        kropkaNaPrzecinek((mLitry * Config.CO2_NA_LITR).format("%.1f"))];
+            podpisy = ["km", "litrow", "kg CO2"];
+        }
+        for (var i = 0; i < 3; i++) {
+            var x = mCx + (i - 1) * xOdstep;
+            dc.setColor(kolor, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(x, yKol, Graphics.FONT_XTINY, wartosci[i],
+                        Graphics.TEXT_JUSTIFY_CENTER);
+            dc.setColor(koloSzary, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(x, yKol + maleH - 2, Graphics.FONT_XTINY, podpisy[i],
+                        Graphics.TEXT_JUSTIFY_CENTER);
+        }
+        dc.setColor(koloSzary, Graphics.COLOR_TRANSPARENT);
+        dc.drawLine(mCx - xOdstep / 2, yKol + 3, mCx - xOdstep / 2, yKol + 2 * maleH - 6);
+        dc.drawLine(mCx + xOdstep / 2, yKol + 3, mCx + xOdstep / 2, yKol + 2 * maleH - 6);
+
+        // zloty wiersz "razem" - suma z calego roku
+        var yRaz = yKol + 2 * maleH + 1;
+        if (mRazem >= 0.01) {
+            dc.setColor(ciemno ? Graphics.COLOR_YELLOW : Graphics.COLOR_ORANGE,
+                        Graphics.COLOR_TRANSPARENT);
+            dc.drawText(mCx, yRaz, Graphics.FONT_XTINY,
+                        "razem " + kwota(mRazem) + " " + mZl,
+                        Graphics.TEXT_JUSTIFY_CENTER);
+        }
+
+        // stopka: cena + trend, jak najnizej sie da
+        var dol = mCy + mR;
+        var warianty = stopkaWarianty();
+        for (var i = 0; i < warianty.size(); i++) {
+            var tekst = warianty[i];
+            var szer = dc.getTextWidthInPixels(tekst, Graphics.FONT_XTINY);
+            var y = yWiersza(szer, maleH, false);
+            if (y > dol - maleH) { y = dol - maleH; }
+            if (y < yRaz + maleH) { continue; }     // nie wjezdzaj na "razem"
+            if (szer <= 2 * polSzerokosci(y, maleH)) {
+                var kolorStopki = koloSzary;
+                if (!mZSieci) {
+                    kolorStopki = ciemno ? Graphics.COLOR_YELLOW : Graphics.COLOR_ORANGE;
+                }
+                dc.setColor(kolorStopki, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(mCx, y, Graphics.FONT_XTINY, tekst,
+                            Graphics.TEXT_JUSTIFY_CENTER);
+                if (mTrend != 0) {
+                    rysujTrend(dc, mCx + szer / 2 + 3, y, maleH);
+                }
+                break;
+            }
+        }
     }
 
     // Duza kwota zlozona z dwoch kawalkow: calosc grubym fontem CYFROWYM,
