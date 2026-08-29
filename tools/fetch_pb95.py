@@ -201,7 +201,8 @@ def wczytaj_biezaca():
     if not os.path.exists(PLIK_CENA):
         return None, None
     with open(PLIK_CENA, "r", encoding="utf-8", errors="ignore") as f:
-        linia = f.read().strip()
+        # cena jest w pierwszej linii; dalej sa doklejone ustawienia
+        linia = f.readline().strip()
     czesci = linia.split(",")
     if len(czesci) == 2 and len(czesci[0]) == 10:
         return czesci[0], na_float(czesci[1])
@@ -244,20 +245,44 @@ def wczytaj_moje_ustawienia():
     return linie
 
 
+def poprzednia_inna_cena(cena, data):
+    """
+    Ostatnia cena z historii ROZNA od biezacej (i nie nowsza niz `data`).
+    Zegarek rysuje z niej strzalke trendu. None = w historii nie ma zmiany.
+    """
+    wpisy = []
+    for klucz, linia in wczytaj_historie().items():
+        czesci = linia.split(";")
+        if len(czesci) >= 2 and klucz <= data:
+            c = na_float(czesci[1])
+            if sensowna(c):
+                wpisy.append((klucz, c))
+    for _, c in sorted(wpisy, reverse=True):
+        if abs(c - cena) >= 0.005:
+            return c
+    return None
+
+
 def zapisz_dla_zegarka(cena, data):
     """
-    Plik, ktory pobiera zegarek: linia z cena + moje ustawienia.
+    Plik, ktory pobiera zegarek: linia z cena + moje ustawienia + poprzednia
+    (inna) cena do strzalki trendu.
     Wolamy to takze wtedy, gdy ceny nie udalo sie odswiezyc - inaczej zmiana
     spalania czy celu nie dojechalaby do zegarka az do nastepnej nowej ceny.
     """
     os.makedirs(os.path.dirname(PLIK_CENA), exist_ok=True)
     ustawienia = wczytaj_moje_ustawienia()
+    poprzednia = poprzednia_inna_cena(cena, data)
     with open(PLIK_CENA, "w", encoding="ascii", newline="\n") as f:
         f.write("%s,%.2f\n" % (data, cena))
         for linia in ustawienia:
             f.write(linia + "\n")
+        if poprzednia is not None:
+            f.write("poprzednia=%.2f\n" % poprzednia)
     if ustawienia:
         print("Doklejone ustawienia: %s" % ", ".join(ustawienia))
+    if poprzednia is not None:
+        print("Poprzednia (inna) cena: %.2f" % poprzednia)
 
 
 def zapisz(cena, data, zrodlo):

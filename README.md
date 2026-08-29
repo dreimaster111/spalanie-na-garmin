@@ -28,6 +28,17 @@ Stopka na pomarańczowo + `?` = cena z internetu jeszcze nie dotarła, liczone
 po cenie awaryjnej z ustawień. Zamiast daty może pojawić się krótki powód
 (`brak telefonu`, `HTTP 404`).
 
+Nad wierszem litrów może pojawić się jeszcze `razem 342 zł` — suma
+oszczędności ze wszystkich jazd w bieżącym roku (liczona przyrostowo w trakcie
+jazdy, zapisywana w Storage co pół minuty; 1 stycznia zeruje się sama).
+Rysuje się tylko, gdy kwota główna ma dalej dość miejsca — w małych kaflach
+odpada pierwsza.
+
+Przy cenie w stopce może stać trójkącik trendu: czerwony w górę = benzyna
+podrożała, zielony w dół = staniała. Kierunek pochodzi z porównania z
+**ostatnią inną** ceną z historii — scraper dokleja ją do pliku dla zegarka
+linią `poprzednia=6.58`.
+
 ### Okrągły ekran to nie prostokąt
 
 Pole danych dostaje do rysowania **prostokąt**, ale na fenixie widać z niego

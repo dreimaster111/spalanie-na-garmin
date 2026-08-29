@@ -16,6 +16,7 @@ module PriceStore {
     const KEY_BLAD = "cenaBlad";    // String albo null
     const KEY_SPALANIE = "ustSpalanie"; // Float, l/100 km z pobranego pliku
     const KEY_CEL = "ustCel";       // Float, cel na przejazd [zl] z pobranego pliku
+    const KEY_POPRZEDNIA = "cenaPoprzednia"; // Float, ostatnia INNA cena - do strzalki trendu
 
     // Cena do liczenia oszczednosci: pobrana z sieci, a jak jej nie ma -
     // awaryjna z ustawien / z Config.
@@ -80,6 +81,26 @@ module PriceStore {
         } catch (e) {
         }
         return null;
+    }
+
+    // Kierunek ostatniej zmiany ceny: 1 = podrozala, -1 = staniala,
+    // 0 = brak danych (albo cena awaryjna, ktora nie ma z czym sie rownac).
+    function trend() as Lang.Number {
+        if (!zSieci()) {
+            return 0;
+        }
+        var pop = liczbaZeStorage(KEY_POPRZEDNIA);
+        if (pop == null || pop <= 0.0) {
+            return 0;
+        }
+        var c = cena();
+        if (c > pop + 0.001) {
+            return 1;
+        }
+        if (c < pop - 0.001) {
+            return -1;
+        }
+        return 0;
     }
 
     function dataCeny() as Lang.String or Null {

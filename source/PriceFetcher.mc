@@ -148,6 +148,7 @@ class PriceFetcher {
         var cena = null;
         var spalanie = null;
         var cel = null;
+        var poprzednia = null;
 
         var reszta = tekst;
         while (reszta != null && reszta.length() > 0) {
@@ -179,6 +180,12 @@ class PriceFetcher {
                 if (t != null && t >= 0.0 && t <= 1000.0) {
                     cel = t;
                 }
+            } else if (zaczynaSie(linia, "poprzednia=")) {
+                // ostatnia INNA cena, dopisywana przez scraper - do strzalki trendu
+                var pp = wartoscPo(linia, 11);
+                if (pp != null && pp > 0.0 && pp < 100.0) {
+                    poprzednia = pp;
+                }
             }
         }
 
@@ -193,6 +200,7 @@ class PriceFetcher {
             // do ustawien/Config, zamiast trzymac starocie w nieskonczonosc.
             zapiszLubSkasuj(PriceStore.KEY_SPALANIE, spalanie);
             zapiszLubSkasuj(PriceStore.KEY_CEL, cel);
+            zapiszLubSkasuj(PriceStore.KEY_POPRZEDNIA, poprzednia);
         } catch (e) {
             return false;
         }

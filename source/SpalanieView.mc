@@ -22,6 +22,8 @@ class SpalanieView extends WatchUi.DataField {
     hidden var mZSieci as Lang.Boolean = false;
     hidden var mDataCeny as Lang.String? = null;
     hidden var mBlad as Lang.String? = null;
+    hidden var mTrend as Lang.Number = 0;      // 1 = cena wzrosla, -1 = spadla
+    hidden var mRazem as Lang.Float = 0.0;     // suma oszczednosci w tym roku
 
     hidden var mKm as Lang.Float = 0.0;
     hidden var mLitry as Lang.Float = 0.0;
@@ -80,6 +82,11 @@ class SpalanieView extends WatchUi.DataField {
             // pierwsza proba tuz po starcie treningu, gdy telefon jest w zasiegu
             sprobujPobrac();
         }
+        // licznik laczny doliczamy co pol minuty (kazdy zapis to flash)
+        if (mLicznik % 30 == 0 && mZlote > 0.0) {
+            SavingsStore.aktualizuj(mZlote);
+            mRazem = SavingsStore.razem();
+        }
     }
 
     // Proba pobrania z poziomu treningu - traktowana jako dodatek do uslugi
@@ -108,6 +115,8 @@ class SpalanieView extends WatchUi.DataField {
         mZSieci = PriceStore.zSieci();
         mDataCeny = PriceStore.dataCeny();
         mBlad = PriceStore.blad();
+        mTrend = PriceStore.trend();
+        mRazem = SavingsStore.razem();
     }
 
     hidden function wczytajUstawienia() as Void {
@@ -218,6 +227,9 @@ class SpalanieView extends WatchUi.DataField {
                 dc.setColor(kolorStopki, Graphics.COLOR_TRANSPARENT);
                 dc.drawText(mCx, y, Graphics.FONT_XTINY, tekst,
                             Graphics.TEXT_JUSTIFY_CENTER);
+                if (mTrend != 0) {
+                    rysujTrend(dc, mCx + szer / 2 + 3, y, maleH);
+                }
                 dol = y - 2;            // wlos odstepu, zeby wiersze nie skleily sie
                 break;
             }
@@ -274,8 +286,41 @@ class SpalanieView extends WatchUi.DataField {
             }
         }
 
+        // wiersz "razem": suma oszczednosci ze wszystkich jazd w tym roku.
+        // Rysuje sie tylko, gdy jest co pokazac i gdy kwota glowna dalej
+        // dostanie przyzwoita wysokosc - w malych kaflach odpada pierwszy.
+        if (mRazem >= 0.01 && (dol - gora - maleH >= minKwota)) {
+            var yRazem = dol - maleH;
+            var razemTxt = "razem " + kwota(mRazem) + " " + mZl;
+            if (dc.getTextWidthInPixels(razemTxt, Graphics.FONT_XTINY)
+                    <= 2 * polSzerokosci(yRazem, maleH) - 4) {
+                dc.setColor(koloSzary, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(mCx, yRazem, Graphics.FONT_XTINY, razemTxt,
+                            Graphics.TEXT_JUSTIFY_CENTER);
+                dol = yRazem;
+            }
+        }
+
         // glowna wartosc - na zielono, gdy cel przejazdu dowieziony
         rysujKwote(dc, gora, dol, celOsiagniety ? Graphics.COLOR_GREEN : kolor);
+    }
+
+    // Strzalka trendu ceny: trojkacik zaraz za tekstem stopki.
+    // Cena w gore = zle = czerwony; w dol = dobrze = zielony.
+    hidden function rysujTrend(dc as Graphics.Dc, x as Lang.Number,
+                               y as Lang.Number, wys as Lang.Number) as Void {
+        var s = wys / 3;            // polowa szerokosci trojkata
+        if (s < 3) { s = 3; }
+        var cy = y + wys / 2;
+        var pol;
+        if (mTrend > 0) {
+            dc.setColor(Graphics.COLOR_RED, Graphics.COLOR_TRANSPARENT);
+            pol = [[x, cy + s / 2], [x + 2 * s, cy + s / 2], [x + s, cy - s]];
+        } else {
+            dc.setColor(Graphics.COLOR_GREEN, Graphics.COLOR_TRANSPARENT);
+            pol = [[x, cy - s / 2], [x + 2 * s, cy - s / 2], [x + s, cy + s]];
+        }
+        dc.fillPolygon(pol);
     }
 
     // --- geometria okraglej tarczy ---------------------------------------
