@@ -454,11 +454,15 @@ class SpalanieView extends WatchUi.DataField {
         var dy = (mCy - yC).toFloat();
         var aDeg = Math.toDegrees(Math.asin(dy / mREkranu)).toFloat();
         var pts = [] as Lang.Array<[Lang.Numeric, Lang.Numeric]>;
-        for (var t = aDeg; t <= 180.0 - aDeg; t += 9.0) {
+        for (var t = aDeg; t < 180.0 - aDeg; t += 9.0) {
             var rad = t * 0.0174533;
             pts.add([mCx + (Math.cos(rad) * mREkranu).toNumber(),
                      mCy - (Math.sin(rad) * mREkranu).toNumber()] as [Lang.Numeric, Lang.Numeric]);
         }
+        // domkniecie dokladnie na cieciwie - bez tego lewa krawedz strefy
+        // konczy sie skosem, gdy 180-2a nie dzieli sie przez krok petli
+        var radK = (180.0 - aDeg) * 0.0174533;
+        pts.add([mCx + (Math.cos(radK) * mREkranu).toNumber(), yC] as [Lang.Numeric, Lang.Numeric]);
         dc.setColor(ciemno ? 0x005500 : 0xAAFFAA, Graphics.COLOR_TRANSPARENT);
         dc.fillPolygon(pts);
 
