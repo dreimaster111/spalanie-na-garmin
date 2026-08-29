@@ -263,6 +263,25 @@ def poprzednia_inna_cena(cena, data):
     return None
 
 
+def historia_dla_zegarka(data, ile=14):
+    """
+    Ostatnie `ile` cen Pb95 z historii (po dacie rosnaco, nie nowsze niz
+    `data`) jako tekst "6.50,6.52,...". Zegarek rysuje z tego mini-wykres.
+    """
+    historia = wczytaj_historie()
+    ceny = []
+    for klucz in sorted(historia):
+        if klucz <= data:
+            czesci = historia[klucz].split(";")
+            c = na_float(czesci[1]) if len(czesci) >= 2 else None
+            if sensowna(c):
+                ceny.append(c)
+    ceny = ceny[-ile:]
+    if len(ceny) < 2:
+        return None
+    return ",".join("%.2f" % c for c in ceny)
+
+
 def zapisz_dla_zegarka(cena, data):
     """
     Plik, ktory pobiera zegarek: linia z cena + moje ustawienia + poprzednia
@@ -279,6 +298,9 @@ def zapisz_dla_zegarka(cena, data):
             f.write(linia + "\n")
         if poprzednia is not None:
             f.write("poprzednia=%.2f\n" % poprzednia)
+        historia = historia_dla_zegarka(data)
+        if historia is not None:
+            f.write("historia=%s\n" % historia)
     if ustawienia:
         print("Doklejone ustawienia: %s" % ", ".join(ustawienia))
     if poprzednia is not None:

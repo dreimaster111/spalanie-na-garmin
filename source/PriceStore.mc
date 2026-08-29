@@ -17,6 +17,7 @@ module PriceStore {
     const KEY_SPALANIE = "ustSpalanie"; // Float, l/100 km z pobranego pliku
     const KEY_CEL = "ustCel";       // Float, cel na przejazd [zl] z pobranego pliku
     const KEY_POPRZEDNIA = "cenaPoprzednia"; // Float, ostatnia INNA cena - do strzalki trendu
+    const KEY_HISTORIA = "cenaHistoria"; // Array<Float>, ostatnie ~14 cen - do mini-wykresu
 
     // Cena do liczenia oszczednosci: pobrana z sieci, a jak jej nie ma -
     // awaryjna z ustawien / z Config.
@@ -101,6 +102,18 @@ module PriceStore {
             return -1;
         }
         return 0;
+    }
+
+    // Historia cen do mini-wykresu; pusta tablica, gdy nic nie przyszlo.
+    function historia() as Lang.Array<Lang.Float> {
+        try {
+            var v = Storage.getValue(KEY_HISTORIA);
+            if (v instanceof Lang.Array && v.size() >= 2) {
+                return v as Lang.Array<Lang.Float>;
+            }
+        } catch (e) {
+        }
+        return [] as Lang.Array<Lang.Float>;
     }
 
     function dataCeny() as Lang.String or Null {

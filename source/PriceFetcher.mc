@@ -149,6 +149,7 @@ class PriceFetcher {
         var spalanie = null;
         var cel = null;
         var poprzednia = null;
+        var historia = null;
 
         var reszta = tekst;
         while (reszta != null && reszta.length() > 0) {
@@ -186,6 +187,9 @@ class PriceFetcher {
                 if (pp != null && pp > 0.0 && pp < 100.0) {
                     poprzednia = pp;
                 }
+            } else if (zaczynaSie(linia, "historia=")) {
+                // ostatnie ~14 cen rozdzielonych przecinkami - do mini-wykresu
+                historia = parsujHistorie(linia.substring(9, linia.length()));
             }
         }
 
@@ -201,10 +205,33 @@ class PriceFetcher {
             zapiszLubSkasuj(PriceStore.KEY_SPALANIE, spalanie);
             zapiszLubSkasuj(PriceStore.KEY_CEL, cel);
             zapiszLubSkasuj(PriceStore.KEY_POPRZEDNIA, poprzednia);
+            zapiszLubSkasuj(PriceStore.KEY_HISTORIA, historia);
         } catch (e) {
             return false;
         }
         return true;
+    }
+
+    // "6.50,6.52,..." -> tablica Float; null gdy mniej niz 2 sensowne wartosci
+    hidden function parsujHistorie(s as Lang.String) as Lang.Array<Lang.Float> or Null {
+        var wynik = [] as Lang.Array<Lang.Float>;
+        var reszta = s;
+        while (reszta.length() > 0 && wynik.size() < 30) {
+            var i = reszta.find(",");
+            var kawalek;
+            if (i != null) {
+                kawalek = reszta.substring(0, i);
+                reszta = reszta.substring(i + 1, reszta.length());
+            } else {
+                kawalek = reszta;
+                reszta = "";
+            }
+            var c = bezBialych(kawalek).toFloat();
+            if (c != null && c > 0.0 && c < 100.0) {
+                wynik.add(c);
+            }
+        }
+        return (wynik.size() >= 2) ? wynik : null;
     }
 
     hidden function zaczynaSie(s as Lang.String, przedrostek as Lang.String) as Lang.Boolean {

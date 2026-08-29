@@ -25,6 +25,7 @@ class SpalanieView extends WatchUi.DataField {
     hidden var mBlad as Lang.String? = null;
     hidden var mTrend as Lang.Number = 0;      // 1 = cena wzrosla, -1 = spadla
     hidden var mRazem as Lang.Float = 0.0;     // suma oszczednosci w tym roku
+    hidden var mHist as Lang.Array<Lang.Float> = [] as Lang.Array<Lang.Float>; // ceny do mini-wykresu
 
     hidden var mKm as Lang.Float = 0.0;
     hidden var mLitry as Lang.Float = 0.0;
@@ -159,6 +160,7 @@ class SpalanieView extends WatchUi.DataField {
         mBlad = PriceStore.blad();
         mTrend = PriceStore.trend();
         mRazem = SavingsStore.razem();
+        mHist = PriceStore.historia();
     }
 
     hidden function wczytajUstawienia() as Void {
@@ -540,6 +542,7 @@ class SpalanieView extends WatchUi.DataField {
 
         // stopka: cena + trend, jak najnizej sie da
         var dol = mCy + mR;
+        var yStopka = dol - maleH;
         var warianty = stopkaWarianty();
         for (var i = 0; i < warianty.size(); i++) {
             var tekst = warianty[i];
@@ -558,9 +561,66 @@ class SpalanieView extends WatchUi.DataField {
                 if (mTrend != 0) {
                     rysujTrend(dc, mCx + szer / 2 + 3, y, maleH);
                 }
+                yStopka = y;
                 break;
             }
         }
+
+        // mini-wykres historii cen Pb95 (ostatnie ~14 dni) - w pasie miedzy
+        // "razem" a stopka, o ile zostalo tam sensowne kilkanascie pikseli
+        rysujHistorie(dc, yRaz + maleH + 3, yStopka - 3, ciemno, koloSzary);
+    }
+
+    // Sparkline cen: linia znormalizowana do min/max historii, kropka na
+    // ostatniej cenie w kolorze trendu. Rysuje sie tylko, gdy jest >= 12 px
+    // wysokosci - w mniejszych kaflach po prostu znika.
+    hidden function rysujHistorie(dc as Graphics.Dc, gora as Lang.Number,
+                                  dol as Lang.Number, ciemno as Lang.Boolean,
+                                  koloSzary) as Void {
+        var n = mHist.size();
+        var wys = dol - gora;
+        if (n < 2 || wys < 12) {
+            return;
+        }
+        if (wys > 26) {
+            gora = dol - 26;    // wyzszy wykres nic nie wnosi, a odsuwa sie od stopki
+            wys = 26;
+        }
+
+        var min = mHist[0];
+        var max = mHist[0];
+        for (var i = 1; i < n; i++) {
+            if (mHist[i] < min) { min = mHist[i]; }
+            if (mHist[i] > max) { max = mHist[i]; }
+        }
+        var zakres = max - min;
+        if (zakres < 0.01) { zakres = 0.01; }   // plaska historia - linia po srodku
+
+        var polS = polSzerokosci(gora, wys) - 12;
+        var szer = 2 * polS;
+        if (szer > 130) { szer = 130; }
+        if (szer < 40) { return; }
+        var x0 = mCx - szer / 2;
+
+        dc.setPenWidth(2);
+        dc.setColor(koloSzary, Graphics.COLOR_TRANSPARENT);
+        var poprzX = x0;
+        var poprzY = dol - ((mHist[0] - min) / zakres * wys).toNumber();
+        for (var i = 1; i < n; i++) {
+            var x = x0 + i * szer / (n - 1);
+            var y = dol - ((mHist[i] - min) / zakres * wys).toNumber();
+            dc.drawLine(poprzX, poprzY, x, y);
+            poprzX = x;
+            poprzY = y;
+        }
+        dc.setPenWidth(1);
+
+        // kropka na dzisiejszej cenie w kolorze trendu
+        var kropka = koloSzary;
+        if (mTrend > 0) { kropka = Graphics.COLOR_RED; }
+        if (mTrend < 0) { kropka = ciemno ? Graphics.COLOR_GREEN : Graphics.COLOR_DK_GREEN; }
+        dc.setColor(kropka, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(poprzX, poprzY, 3);
     }
 
     // Duza kwota zlozona z dwoch kawalkow: calosc grubym fontem CYFROWYM,
