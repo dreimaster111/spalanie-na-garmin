@@ -307,18 +307,20 @@ def zapisz_dla_zegarka(cena, data):
     if poprzednia is not None:
         print("Poprzednia (inna) cena: %.2f" % poprzednia)
 
-    # osobny plik dla widgetu historii: 30 dni z DATAMI (pole danych
-    # dostaje tylko ceny, widget pokazuje tez ktory to byl dzien)
+    # osobny plik dla widgetu historii: caly biezacy rok z DATAMI (pole
+    # danych dostaje tylko ceny, widget pozwala przewijac po dniach).
+    # Rok cen to ~4 KB - dla widgetu (nie uslugi w tle) to zaden problem.
     historia = wczytaj_historie()
+    rok = data[:4]
     linie = []
     for klucz in sorted(historia):
-        if klucz <= data:
+        if klucz <= data and klucz.startswith(rok):
             czesci = historia[klucz].split(";")
             c = na_float(czesci[1]) if len(czesci) >= 2 else None
             if sensowna(c):
                 linie.append("%s,%.2f" % (klucz, c))
     with open(PLIK_WIDGET, "w", encoding="ascii", newline="\n") as f:
-        for linia in linie[-30:]:
+        for linia in linie[-366:]:
             f.write(linia + "\n")
 
 

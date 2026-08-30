@@ -1,7 +1,8 @@
 using Toybox.Lang;
 using Toybox.WatchUi;
 
-// Gora/dol (przyciski albo przewijanie dotykiem) przesuwa zaznaczony dzien.
+// Gora/dol (przyciski albo przewijanie dotykiem) przesuwa zaznaczony dzien,
+// START odswieza dane z sieci, MENU (przytrzymanie UP) wraca do dzis.
 class CenyDelegate extends WatchUi.BehaviorDelegate {
 
     hidden var mView as CenyView;
@@ -23,6 +24,12 @@ class CenyDelegate extends WatchUi.BehaviorDelegate {
 
     function onSelect() as Lang.Boolean {
         CenyDane.pobierz();     // START = odswiez z sieci
+        WatchUi.requestUpdate();
+        return true;
+    }
+
+    function onMenu() as Lang.Boolean {
+        mView.doDzis();         // przytrzymanie UP = skok do najnowszego dnia
         return true;
     }
 }

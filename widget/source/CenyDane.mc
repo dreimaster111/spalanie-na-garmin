@@ -88,7 +88,7 @@ module CenyDane {
         var d = [] as Lang.Array<Lang.String>;
         var c = [] as Lang.Array<Lang.Float>;
         var reszta = tekst;
-        while (reszta.length() > 0 && d.size() < 60) {
+        while (reszta.length() > 0 && d.size() < 400) {
             var nl = reszta.find("\n");
             var linia;
             if (nl != null) {

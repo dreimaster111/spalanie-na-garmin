@@ -1,14 +1,26 @@
 using Toybox.Graphics;
 using Toybox.Lang;
 using Toybox.Math;
+using Toybox.Time;
+using Toybox.Time.Gregorian;
 using Toybox.WatchUi;
 
-// Pelnoekranowy wykres slupkowy historii Pb95 z zaznaczeniem dnia.
-// Gora/dol (albo przewijanie) przesuwa zaznaczenie, domyslnie na dzis.
+// Historia cen Pb95 od poczatku roku.
+//
+// Ekran pokazuje OKNO 7 dni jako szerokie slupki (czytelne z roweru,
+// nie 150 wlosow jak przy calym roku naraz). Gora/dol przesuwa zaznaczony
+// dzien; gdy zaznaczenie dojdzie do krawedzi okna, okno plynie dalej -
+// tak da sie dojechac od dzis do 1 stycznia. Naglowek zawsze opisuje
+// zaznaczony dzien: dzien tygodnia, data, duza cena i zmiana wzgledem
+// poprzedniego notowania.
 class CenyView extends WatchUi.View {
 
-    // -1 = zaznaczony ostatni (najnowszy) dzien
-    var mWybor as Lang.Number = -1;
+    const OKNO = 7;                          // ile slupkow widac naraz
+
+    var mWybor as Lang.Number = -1;          // -1 = najnowszy dzien
+    hidden var mOkno as Lang.Number = -1;    // indeks pierwszego slupka okna
+
+    hidden const DNI = ["nd", "pn", "wt", "sr", "cz", "pt", "sb"];
 
     function initialize() {
         View.initialize();
@@ -23,11 +35,19 @@ class CenyView extends WatchUi.View {
         if (n == 0) {
             return;
         }
-        var i = (mWybor < 0) ? (n - 1) : mWybor;
+        var i = (mWybor < 0 || mWybor > n - 1) ? (n - 1) : mWybor;
         i = i + oIle;
         if (i < 0) { i = 0; }
         if (i > n - 1) { i = n - 1; }
-        mWybor = i;
+        // najnowszy dzien trzymamy jako sentinel -1: po odswiezeniu, ktore
+        // dolozy dzisiejsza cene, zaznaczenie samo na nia przeskoczy
+        mWybor = (i == n - 1) ? -1 : i;
+        WatchUi.requestUpdate();
+    }
+
+    function doDzis() as Void {
+        mWybor = -1;
+        mOkno = -1;
         WatchUi.requestUpdate();
     }
 
@@ -39,60 +59,202 @@ class CenyView extends WatchUi.View {
         var h = dc.getHeight();
         var cx = w / 2;
         var maleH = dc.getFontHeight(Graphics.FONT_XTINY);
-
         var n = CenyDane.ceny.size();
+
         if (n == 0) {
-            var info = (CenyDane.blad != null) ? CenyDane.blad : "Pobieram...";
-            dc.drawText(cx, h / 2, Graphics.FONT_SMALL, "Ceny Pb95\n" + info,
-                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            rysujSplash(dc, cx, h);
             return;
         }
 
         var i = (mWybor < 0 || mWybor > n - 1) ? (n - 1) : mWybor;
 
-        // naglowek: wybrany dzien + jego cena
-        var data = CenyDane.daty[i];
-        var dzien = data.substring(8, 10) + "." + data.substring(5, 7);
+        // okno podaza za zaznaczeniem
+        if (mOkno < 0) { mOkno = n - OKNO; }
+        if (mOkno < 0) { mOkno = 0; }
+        if (i < mOkno) { mOkno = i; }
+        if (i > mOkno + OKNO - 1) { mOkno = i - OKNO + 1; }
+        if (mOkno + OKNO > n) { mOkno = n - OKNO; }
+        if (mOkno < 0) { mOkno = 0; }
+
+        // --- naglowek: tytul, dzien, cena, zmiana --------------------------
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, h / 9, Graphics.FONT_XTINY, "Pb95  ·  " + dzien,
-                    Graphics.TEXT_JUSTIFY_CENTER);
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, h / 9 + maleH, Graphics.FONT_NUMBER_MEDIUM,
-                    naPrzecinek(CenyDane.ceny[i].format("%.2f")),
+        dc.drawText(cx, h * 5 / 100, Graphics.FONT_XTINY,
+                    CenyDane.wToku ? "Cena Pb95 ..." : "Cena Pb95",
                     Graphics.TEXT_JUSTIFY_CENTER);
 
-        // zakres min/max calej historii
+        var data = CenyDane.daty[i];
+        dc.drawText(cx, h * 12 / 100, Graphics.FONT_SMALL,
+                    dzienTygodnia(data) + ", " + data.substring(8, 10) + "."
+                        + data.substring(5, 7),
+                    Graphics.TEXT_JUSTIFY_CENTER);
+
+        // Duza cena skladana z dwoch czesci: zlotowki fontem CYFROWYM,
+        // ",gr" mniejszym fontem tekstowym. Fonty FONT_NUMBER_* na fenixie 6
+        // NIE MAJA glifu przecinka (maja tylko cyfry i kropke), wiec przecinek
+        // musi przyjsc z fontu tekstowego - tak samo robi to pole danych.
+        var cenaTxt = CenyDane.ceny[i].format("%.2f");
+        var kropka = cenaTxt.find(".");
+        var duzy = (kropka == null) ? cenaTxt : cenaTxt.substring(0, kropka);
+        var maly = (kropka == null) ? ""
+            : "," + cenaTxt.substring(kropka + 1, cenaTxt.length());
+        var fontCeny = Graphics.FONT_NUMBER_MEDIUM;
+        var fontGr = Graphics.FONT_SMALL;
+        var yCeny = h * 21 / 100;
+        var hd = dc.getFontHeight(fontCeny);
+        var wd = dc.getTextWidthInPixels(duzy, fontCeny);
+        var wm = dc.getTextWidthInPixels(maly, fontGr);
+        var xCeny = cx - (wd + wm) / 2;
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(xCeny, yCeny, fontCeny, duzy, Graphics.TEXT_JUSTIFY_LEFT);
+        // korekta jak w polu danych: fonty cyfrowe maja pod cyframi pusty pas
+        dc.drawText(xCeny + wd, yCeny + hd - dc.getFontHeight(fontGr) - hd / 6,
+                    fontGr, maly, Graphics.TEXT_JUSTIFY_LEFT);
+
+        // zmiana wzgledem poprzedniego notowania, obok ceny; gdy poprzednie
+        // notowanie nie jest z dnia poprzedniego (dziura w danych), rysujemy
+        // na szaro - to nie jest zmiana "z dnia na dzien"
+        if (i > 0) {
+            var delta = CenyDane.ceny[i] - CenyDane.ceny[i - 1];
+            var ciagle = kolejnyDzien(CenyDane.daty[i - 1], CenyDane.daty[i]);
+            var deltaTxt;
+            var kolorD;
+            if (delta > 0.004) {
+                deltaTxt = "+" + naPrzecinek(delta.format("%.2f"));
+                kolorD = ciagle ? Graphics.COLOR_RED : Graphics.COLOR_LT_GRAY;
+            } else if (delta < -0.004) {
+                deltaTxt = naPrzecinek(delta.format("%.2f"));
+                kolorD = ciagle ? Graphics.COLOR_GREEN : Graphics.COLOR_LT_GRAY;
+            } else {
+                deltaTxt = "=";
+                kolorD = Graphics.COLOR_LT_GRAY;
+            }
+            dc.setColor(kolorD, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(xCeny + wd + wm + 6,
+                        yCeny + hd / 2 - maleH / 2,
+                        Graphics.FONT_XTINY, deltaTxt, Graphics.TEXT_JUSTIFY_LEFT);
+        }
+
+        // --- wykres: 7 szerokich slupkow -----------------------------------
+        var goraW = h * 47 / 100;
+        var dolW = h * 72 / 100;
+        var wysW = dolW - goraW;
+        var chartW = w * 66 / 100;
+        var pokaz = (n < OKNO) ? n : OKNO;
+        var krok = chartW / OKNO;
+        var x0 = cx - (krok * pokaz) / 2;
+
+        // skala z widocznego okna - grosze robia roznice, wiec nie od zera
+        var visMin = CenyDane.ceny[mOkno];
+        var visMax = visMin;
+        for (var k = mOkno; k < mOkno + pokaz; k++) {
+            if (CenyDane.ceny[k] < visMin) { visMin = CenyDane.ceny[k]; }
+            if (CenyDane.ceny[k] > visMax) { visMax = CenyDane.ceny[k]; }
+        }
+        var zakres = visMax - visMin;
+        if (zakres < 0.01) { zakres = 0.01; }
+
+        for (var k = 0; k < pokaz; k++) {
+            var idx = mOkno + k;
+            var v = CenyDane.ceny[idx];
+            var sh = 5 + ((v - visMin) / zakres * (wysW - 5)).toNumber();
+            var bx = (x0 + k * krok).toNumber() + 2;
+            var bw = krok - 4;
+            dc.setColor((idx == i) ? Graphics.COLOR_YELLOW : Graphics.COLOR_DK_GRAY,
+                        Graphics.COLOR_TRANSPARENT);
+            dc.fillRoundedRectangle(bx, dolW - sh, bw, sh, 3);
+
+            // dzien miesiaca pod slupkiem
+            var dzien = CenyDane.daty[idx].substring(8, 10);
+            if (dzien.substring(0, 1).equals("0")) {
+                dzien = dzien.substring(1, 2);
+            }
+            dc.setColor((idx == i) ? Graphics.COLOR_YELLOW : Graphics.COLOR_LT_GRAY,
+                        Graphics.COLOR_TRANSPARENT);
+            dc.drawText(bx + bw / 2, dolW + 3, Graphics.FONT_XTINY, dzien,
+                        Graphics.TEXT_JUSTIFY_CENTER);
+        }
+
+        // strzalki: czy jest cos starszego / nowszego poza oknem
+        var ySt = goraW + wysW / 2;
+        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+        if (mOkno > 0) {
+            // grot w LEWO - tam jest starsza historia
+            dc.fillPolygon([[x0.toNumber() - 16, ySt],
+                            [x0.toNumber() - 8, ySt - 6],
+                            [x0.toNumber() - 8, ySt + 6]] as Lang.Array<[Lang.Numeric, Lang.Numeric]>);
+        }
+        if (mOkno + pokaz < n) {
+            // grot w PRAWO - nowsze dni
+            var xp = (x0 + pokaz * krok).toNumber();
+            dc.fillPolygon([[xp + 16, ySt],
+                            [xp + 8, ySt - 6],
+                            [xp + 8, ySt + 6]] as Lang.Array<[Lang.Numeric, Lang.Numeric]>);
+        }
+
+        // --- stopka: zakres calej wczytanej historii -----------------------
         var min = CenyDane.ceny[0];
-        var max = CenyDane.ceny[0];
+        var max = min;
         for (var k = 1; k < n; k++) {
             if (CenyDane.ceny[k] < min) { min = CenyDane.ceny[k]; }
             if (CenyDane.ceny[k] > max) { max = CenyDane.ceny[k]; }
         }
-        var zakres = max - min;
-        if (zakres < 0.01) { zakres = 0.01; }
-
-        // wykres: pas na dole, szerokosc ~72% ekranu (bezpieczna na kole)
-        var wykresSzer = w * 72 / 100;
-        var x0 = cx - wykresSzer / 2;
-        var dolW = h * 78 / 100;
-        var wysW = h * 30 / 100;
-        var krok = wykresSzer.toFloat() / n;
-        var slupek = (krok - 1.0).toNumber();
-        if (slupek < 2) { slupek = 2; }
-
-        for (var k = 0; k < n; k++) {
-            var sh = 3 + ((CenyDane.ceny[k] - min) / zakres * (wysW - 3)).toNumber();
-            dc.setColor((k == i) ? Graphics.COLOR_YELLOW : Graphics.COLOR_DK_GRAY,
-                        Graphics.COLOR_TRANSPARENT);
-            dc.fillRectangle((x0 + k * krok).toNumber(), dolW - sh, slupek, sh);
-        }
-
-        // zakres pod wykresem, wysrodkowany - boczne etykiety obcinala tarcza
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, dolW + 6, Graphics.FONT_XTINY,
-                    "min " + naPrzecinek(min.format("%.2f"))
-                    + "   max " + naPrzecinek(max.format("%.2f")),
+        dc.drawText(cx, dolW + maleH + 6, Graphics.FONT_XTINY,
+                    "rok:  " + naPrzecinek(min.format("%.2f")) + " - "
+                        + naPrzecinek(max.format("%.2f")),
                     Graphics.TEXT_JUSTIFY_CENTER);
+    }
+
+    hidden function rysujSplash(dc as Graphics.Dc, cx as Lang.Number,
+                                h as Lang.Number) as Void {
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, h * 30 / 100, Graphics.FONT_MEDIUM, "Ceny Pb95",
+                    Graphics.TEXT_JUSTIFY_CENTER);
+        var info = CenyDane.wToku ? "Pobieram..."
+            : ((CenyDane.blad != null) ? CenyDane.blad : "Brak danych");
+        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, h * 45 / 100, Graphics.FONT_SMALL, info,
+                    Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, h * 60 / 100, Graphics.FONT_XTINY, "START = odswiez",
+                    Graphics.TEXT_JUSTIFY_CENTER);
+    }
+
+    // Czy data b jest dokladnie nastepnym dniem po a? (obie "YYYY-MM-DD")
+    hidden function kolejnyDzien(a as Lang.String, b as Lang.String) as Lang.Boolean {
+        try {
+            var ma = Gregorian.moment({
+                :year => a.substring(0, 4).toNumber(),
+                :month => a.substring(5, 7).toNumber(),
+                :day => a.substring(8, 10).toNumber(),
+                :hour => 12
+            });
+            var mb = Gregorian.moment({
+                :year => b.substring(0, 4).toNumber(),
+                :month => b.substring(5, 7).toNumber(),
+                :day => b.substring(8, 10).toNumber(),
+                :hour => 12
+            });
+            var roznica = mb.value() - ma.value();
+            return roznica > 20 * 3600 && roznica < 28 * 3600;
+        } catch (e) {
+            return true;    // w razie watpliwosci nie strasz szaroscia
+        }
+    }
+
+    // "2026-08-29" -> "pt" (skrot dnia tygodnia)
+    hidden function dzienTygodnia(data as Lang.String) as Lang.String {
+        try {
+            var m = Gregorian.moment({
+                :year => data.substring(0, 4).toNumber(),
+                :month => data.substring(5, 7).toNumber(),
+                :day => data.substring(8, 10).toNumber(),
+                :hour => 12
+            });
+            var dow = Gregorian.info(m, Time.FORMAT_SHORT).day_of_week as Lang.Number;
+            return DNI[dow - 1];
+        } catch (e) {
+            return "";
+        }
     }
 
     hidden function naPrzecinek(s as Lang.String) as Lang.String {
