@@ -12,6 +12,7 @@ module CenyDane {
     const URL = "https://raw.githubusercontent.com/dreimaster111/spalanie-na-garmin/main/data/pb95-widget.txt";
     const KEY_TEKST = "widgetTekst";     // surowy pobrany plik
     const KEY_POBRANO = "widgetPobrano"; // epoch ostatniego pobrania
+    const KEY_GLANCE = "glanceDane";     // [data, cena, poprzednia] dla podgladu
     const ODSWIEZ_CO_SEK = 6 * 3600;
 
     var daty as Lang.Array<Lang.String> = [] as Lang.Array<Lang.String>;
@@ -29,6 +30,7 @@ module CenyDane {
             }
             if (t instanceof Lang.String) {
                 parsuj(t);
+                zapiszGlance();     // starsza wersja widgetu nie zapisywala podsumowania
             }
         }
         var ostatnio = null;
@@ -75,6 +77,7 @@ module CenyDane {
                     Storage.setValue(KEY_POBRANO, Time.now().value());
                 } catch (e) {
                 }
+                zapiszGlance();
             } else {
                 blad = "zly format";
             }
@@ -82,6 +85,27 @@ module CenyDane {
             blad = "HTTP " + kod;
         }
         WatchUi.requestUpdate();
+    }
+
+    // Krotkie podsumowanie dla podgladu (glance): ostatnia data, cena
+    // i poprzednia INNA cena do strzalki trendu. Glance ma malo pamieci
+    // i nie parsuje calego roku - czyta tylko te trzy wartosci.
+    function zapiszGlance() as Void {
+        var n = ceny.size();
+        if (n == 0) {
+            return;
+        }
+        var poprzednia = -1.0;
+        for (var i = n - 2; i >= 0; i--) {
+            if ((ceny[i] - ceny[n - 1]).abs() >= 0.005) {
+                poprzednia = ceny[i];
+                break;
+            }
+        }
+        try {
+            Storage.setValue(KEY_GLANCE, [daty[n - 1], ceny[n - 1], poprzednia]);
+        } catch (e) {
+        }
     }
 
     function parsuj(tekst as Lang.String) as Void {
