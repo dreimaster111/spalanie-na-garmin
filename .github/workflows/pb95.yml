@@ -25,6 +25,6 @@ jobs:
         run: |
           git config user.name "paliwo-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add data/pb95.txt data/pb95-historia.csv
+          git add data/pb95.txt data/pb95-historia.csv data/pb95-widget.txt
           git diff --cached --quiet || git commit -m "Cena Pb95 [bot]"
           git push
