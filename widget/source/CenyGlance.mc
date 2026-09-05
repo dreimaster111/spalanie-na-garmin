@@ -31,7 +31,50 @@ class CenyGlance extends WatchUi.GlanceView {
                 if (v[1] instanceof Lang.Float) { mCena = v[1]; }
                 if (v[2] instanceof Lang.Float && v[2] > 0.0) { mPoprzednia = v[2]; }
             }
+            if (mCena == null) {
+                // brak podsumowania (np. widget zaktualizowany, ale jeszcze nie
+                // otwarty) - wyciagnij je z ogona pobranego pliku w cache
+                var t = Storage.getValue("widgetTekst");
+                if (t instanceof Lang.String) {
+                    zOgona(t);
+                }
+            }
         } catch (e) {
+        }
+    }
+
+    // Czyta OSTATNIE linie "YYYY-MM-DD,cena" skanujac tekst od konca -
+    // bez parsowania calego roku, na ktory glance nie ma pamieci ani czasu.
+    // Ostatnia linia = dzisiejsza cena; cofa sie dalej (max ~20 linii)
+    // po pierwsza INNA cene do strzalki trendu.
+    hidden function zOgona(t as Lang.String) as Void {
+        var koniec = t.length();
+        while (koniec > 0 && t.substring(koniec - 1, koniec).equals("\n")) {
+            koniec--;
+        }
+        var linie = 0;
+        var k = koniec;
+        while (k > 0 && linie < 20) {
+            // poczatek biezacej linii
+            var start = k;
+            while (start > 0 && !t.substring(start - 1, start).equals("\n")) {
+                start--;
+            }
+            var linia = t.substring(start, k);
+            if (linia.length() >= 12 && linia.substring(4, 5).equals("-")) {
+                var c = linia.substring(11, linia.length()).toFloat();
+                if (c != null && c > 0.0) {
+                    if (mCena == null) {
+                        mCena = c;
+                        mData = linia.substring(0, 10);
+                    } else if ((c - mCena).abs() >= 0.005) {
+                        mPoprzednia = c;
+                        return;
+                    }
+                }
+            }
+            linie++;
+            k = start - 1;      // przeskocz znak nowej linii
         }
     }
 
@@ -50,7 +93,8 @@ class CenyGlance extends WatchUi.GlanceView {
         dc.drawText(0, y0, fontT, "CENA PB95", Graphics.TEXT_JUSTIFY_LEFT);
 
         if (mCena == null) {
-            dc.drawText(0, y0 + hT, fontC, "otworz, aby pobrac", Graphics.TEXT_JUSTIFY_LEFT);
+            // placeholder malym fontem - w pasie podgladu nie ma miejsca na wiecej
+            dc.drawText(0, y0 + hT, fontT, "otworz, aby pobrac", Graphics.TEXT_JUSTIFY_LEFT);
             return;
         }
 
