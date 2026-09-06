@@ -21,6 +21,8 @@ class CenyView extends WatchUi.View {
     hidden var mOkno as Lang.Number = -1;    // indeks pierwszego slupka okna
 
     hidden const DNI = ["nd", "pn", "wt", "sr", "cz", "pt", "sb"];
+    hidden const MIES = ["sty", "lut", "mar", "kwi", "maj", "cze",
+                         "lip", "sie", "wrz", "paz", "lis", "gru"];
 
     function initialize() {
         View.initialize();
@@ -76,16 +78,14 @@ class CenyView extends WatchUi.View {
         if (mOkno + OKNO > n) { mOkno = n - OKNO; }
         if (mOkno < 0) { mOkno = 0; }
 
-        // --- naglowek: tytul, dzien, cena, zmiana --------------------------
-        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, h * 5 / 100, Graphics.FONT_XTINY,
-                    CenyDane.wToku ? "Cena Pb95 ..." : "Cena Pb95",
-                    Graphics.TEXT_JUSTIFY_CENTER);
-
+        // --- naglowek: dzien, cena, zmiana ---------------------------------
+        // Bez tytulu "Cena Pb95" - uzytkownik wie, co otworzyl, a kazdy
+        // wiersz u gory tarczy to wiersz mniej na dole, gdzie jest ciasno.
         var data = CenyDane.daty[i];
-        dc.drawText(cx, h * 12 / 100, Graphics.FONT_SMALL,
+        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, h * 6 / 100, Graphics.FONT_SMALL,
                     dzienTygodnia(data) + ", " + data.substring(8, 10) + "."
-                        + data.substring(5, 7),
+                        + data.substring(5, 7) + (CenyDane.wToku ? " ..." : ""),
                     Graphics.TEXT_JUSTIFY_CENTER);
 
         // Duza cena skladana z dwoch czesci: zlotowki fontem CYFROWYM,
@@ -99,7 +99,7 @@ class CenyView extends WatchUi.View {
             : "," + cenaTxt.substring(kropka + 1, cenaTxt.length());
         var fontCeny = Graphics.FONT_NUMBER_MEDIUM;
         var fontGr = Graphics.FONT_SMALL;
-        var yCeny = h * 21 / 100;
+        var yCeny = h * 16 / 100;
         var hd = dc.getFontHeight(fontCeny);
         var wd = dc.getTextWidthInPixels(duzy, fontCeny);
         var wm = dc.getTextWidthInPixels(maly, fontGr);
@@ -135,8 +135,8 @@ class CenyView extends WatchUi.View {
         }
 
         // --- wykres: 7 szerokich slupkow -----------------------------------
-        var goraW = h * 47 / 100;
-        var dolW = h * 72 / 100;
+        var goraW = h * 43 / 100;
+        var dolW = h * 67 / 100;
         var wysW = dolW - goraW;
         var chartW = w * 66 / 100;
         var pokaz = (n < OKNO) ? n : OKNO;
@@ -172,6 +172,15 @@ class CenyView extends WatchUi.View {
                         Graphics.COLOR_TRANSPARENT);
             dc.drawText(bx + bw / 2, dolW + 3, Graphics.FONT_XTINY, dzien,
                         Graphics.TEXT_JUSTIFY_CENTER);
+            // pierwszy dzien miesiaca dostaje pod numerem skrot miesiaca -
+            // przy przelomie (30 31 1 2 3) od razu widac, ktory to miesiac
+            if (dzien.equals("1")) {
+                var m = CenyDane.daty[idx].substring(5, 7).toNumber();
+                if (m != null && m >= 1 && m <= 12) {
+                    dc.drawText(bx + bw / 2, dolW + 1 + maleH, Graphics.FONT_XTINY,
+                                MIES[m - 1], Graphics.TEXT_JUSTIFY_CENTER);
+                }
+            }
         }
 
         // strzalki: czy jest cos starszego / nowszego poza oknem
@@ -199,7 +208,7 @@ class CenyView extends WatchUi.View {
             if (CenyDane.ceny[k] > max) { max = CenyDane.ceny[k]; }
         }
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, dolW + maleH + 6, Graphics.FONT_XTINY,
+        dc.drawText(cx, dolW + 2 * maleH + 4, Graphics.FONT_XTINY,
                     "rok:  " + naPrzecinek(min.format("%.2f")) + " - "
                         + naPrzecinek(max.format("%.2f")),
                     Graphics.TEXT_JUSTIFY_CENTER);
