@@ -83,7 +83,7 @@ class CenyView extends WatchUi.View {
         // wiersz u gory tarczy to wiersz mniej na dole, gdzie jest ciasno.
         var data = CenyDane.daty[i];
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, h * 6 / 100, Graphics.FONT_SMALL,
+        dc.drawText(cx, h * 4 / 100, Graphics.FONT_SMALL,
                     dzienTygodnia(data) + ", " + data.substring(8, 10) + "."
                         + data.substring(5, 7) + (CenyDane.wToku ? " ..." : ""),
                     Graphics.TEXT_JUSTIFY_CENTER);
@@ -99,7 +99,7 @@ class CenyView extends WatchUi.View {
             : "," + cenaTxt.substring(kropka + 1, cenaTxt.length());
         var fontCeny = Graphics.FONT_NUMBER_MEDIUM;
         var fontGr = Graphics.FONT_SMALL;
-        var yCeny = h * 16 / 100;
+        var yCeny = h * 14 / 100;
         var hd = dc.getFontHeight(fontCeny);
         var wd = dc.getTextWidthInPixels(duzy, fontCeny);
         var wm = dc.getTextWidthInPixels(maly, fontGr);
@@ -134,9 +134,17 @@ class CenyView extends WatchUi.View {
                         Graphics.FONT_XTINY, deltaTxt, Graphics.TEXT_JUSTIFY_LEFT);
         }
 
+        // --- zmiana tygodniowa i miesieczna, pod cena ------------------------
+        // Jednodniowy skok obok ceny malo mowi; tu porownanie z notowaniem
+        // sprzed 7 i 30 dni (najblizszym NIE nowszym niz ta data - w danych
+        // bywaja dziury). Kazda wartosc w kolorze kierunku.
+        // hd fontu cyfrowego zawiera duzy pusty pas pod cyframi (ok. 1/6),
+        // wiec wiersz siada tuz pod widocznymi cyframi, nie pod calym fontem
+        rysujZmiany(dc, cx, yCeny + hd - hd / 6 + 2, i, maleH);
+
         // --- wykres: 7 szerokich slupkow -----------------------------------
-        var goraW = h * 43 / 100;
-        var dolW = h * 67 / 100;
+        var goraW = h * 52 / 100;
+        var dolW = h * 71 / 100;
         var wysW = dolW - goraW;
         var chartW = w * 66 / 100;
         var pokaz = (n < OKNO) ? n : OKNO;
@@ -226,6 +234,86 @@ class CenyView extends WatchUi.View {
                     Graphics.TEXT_JUSTIFY_CENTER);
         dc.drawText(cx, h * 60 / 100, Graphics.FONT_XTINY, "START = odswiez",
                     Graphics.TEXT_JUSTIFY_CENTER);
+    }
+
+    // "tydz. +0,32  ·  mies. -0,10" wysrodkowane; wartosci kolorowane.
+    hidden function rysujZmiany(dc as Graphics.Dc, cx as Lang.Number,
+                                y as Lang.Number, i as Lang.Number,
+                                maleH as Lang.Number) as Void {
+        var f = Graphics.FONT_XTINY;
+        var czesci = [
+            ["tydz. ", Graphics.COLOR_LT_GRAY],
+            [tekstZmiany(zmianaOd(i, 7)), kolorZmiany(zmianaOd(i, 7))],
+            ["   mies. ", Graphics.COLOR_LT_GRAY],
+            [tekstZmiany(zmianaOd(i, 30)), kolorZmiany(zmianaOd(i, 30))]
+        ];
+        var szer = 0;
+        for (var k = 0; k < czesci.size(); k++) {
+            szer += dc.getTextWidthInPixels(czesci[k][0] as Lang.String, f);
+        }
+        var x = cx - szer / 2;
+        for (var k = 0; k < czesci.size(); k++) {
+            var t = czesci[k][0] as Lang.String;
+            dc.setColor(czesci[k][1], Graphics.COLOR_TRANSPARENT);
+            dc.drawText(x, y, f, t, Graphics.TEXT_JUSTIFY_LEFT);
+            x += dc.getTextWidthInPixels(t, f);
+        }
+    }
+
+    hidden function tekstZmiany(d as Lang.Float or Null) as Lang.String {
+        if (d == null) {
+            return "-";
+        }
+        if (d > 0.004) {
+            return "+" + naPrzecinek(d.format("%.2f"));
+        }
+        if (d < -0.004) {
+            return naPrzecinek(d.format("%.2f"));
+        }
+        return "0,00";
+    }
+
+    hidden function kolorZmiany(d as Lang.Float or Null) {
+        if (d == null) {
+            return Graphics.COLOR_LT_GRAY;
+        }
+        if (d > 0.004) {
+            return Graphics.COLOR_RED;
+        }
+        if (d < -0.004) {
+            return Graphics.COLOR_GREEN;
+        }
+        return Graphics.COLOR_LT_GRAY;
+    }
+
+    // Roznica ceny[i] wzgledem ostatniego notowania sprzed >= `dni` dni.
+    // null, gdy historia nie siega tak daleko.
+    hidden function zmianaOd(i as Lang.Number, dni as Lang.Number) as Lang.Float or Null {
+        var mi = moment(CenyDane.daty[i]);
+        if (mi == null) {
+            return null;
+        }
+        var cel = mi.value() - dni * 86400;
+        for (var k = i - 1; k >= 0; k--) {
+            var mk = moment(CenyDane.daty[k]);
+            if (mk != null && mk.value() <= cel) {
+                return CenyDane.ceny[i] - CenyDane.ceny[k];
+            }
+        }
+        return null;
+    }
+
+    hidden function moment(data as Lang.String) as Time.Moment or Null {
+        try {
+            return Gregorian.moment({
+                :year => data.substring(0, 4).toNumber(),
+                :month => data.substring(5, 7).toNumber(),
+                :day => data.substring(8, 10).toNumber(),
+                :hour => 12
+            });
+        } catch (e) {
+            return null;
+        }
     }
 
     // Czy data b jest dokladnie nastepnym dniem po a? (obie "YYYY-MM-DD")
